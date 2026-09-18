@@ -37,25 +37,67 @@
     .animate-ticker {
       display: flex;
       width: max-content;
-      animation: ticker 28s linear infinite;
+      animation: ticker 45s linear infinite;
     }
     .animate-ticker:hover {
       animation-play-state: paused;
     }
   </style>
+
+  <!-- FIREBASE MODULE SDK IMPORTS -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Global App Configuration
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'wos-attack-logger-state-4336';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' 
+      ? JSON.parse(__firebase_config) 
+      : {
+          apiKey: "AIzaSyDQuzprhL2M3hrR585iyHeLr0BtUTMfCxA",
+          authDomain: "svs-scheduler-a1919.firebaseapp.com",
+          databaseURL: "https://svs-scheduler-a1919-default-rtdb.firebaseio.com",
+          projectId: "svs-scheduler-a1919",
+          storageBucket: "svs-scheduler-a1919.firebasestorage.app",
+          messagingSenderId: "1070850863206",
+          appId: "1:1070850863206:web:a2de4c38691fd0c89ebda7",
+          measurementId: "G-W0DFYH7M9Q"
+        };
+
+    // Initialize Firebase
+    const firebaseApp = initializeApp(firebaseConfig);
+    const auth = getAuth(firebaseApp);
+    const db = getFirestore(firebaseApp);
+
+    // Export Firebase utilities to global window scope for app logic
+    window.WOS_FIREBASE = {
+      appId,
+      auth,
+      db,
+      doc,
+      addDoc,
+      setDoc,
+      updateDoc,
+      deleteDoc,
+      onSnapshot,
+      collection,
+      signInAnonymously,
+      signInWithCustomToken
+    };
+  </script>
 </head>
 <body class="bg-frost-900 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
 
   <!-- ========================================== -->
-  <!-- DEMO PREVIEW NOTICE BANNER                -->
+  <!-- DEMO PREVIEW & FIREBASE STATUS BANNER     -->
   <!-- ========================================== -->
-  <div class="bg-amber-950/90 border-b border-amber-500/30 text-amber-200 text-xs py-1.5 px-4 text-center font-medium">
-    <span>⚡ DEMO PREVIEW MODE: OCR uploads & card edits are saved locally in your browser for testing. Live server sync coming soon!</span>
+  <div class="bg-amber-950/90 border-b border-amber-500/30 text-amber-200 text-xs py-1.5 px-4 text-center font-medium flex items-center justify-center gap-2">
+    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+    <span>🔥 LIVE FIREBASE SYNC: Combat reports and player alias paper trails are synced in real-time across State #4336.</span>
   </div>
 
-  <!-- ========================================== -->
-  <!-- SECTION 0: LIVE ALERT TICKER BAR           -->
-  <!-- ========================================== -->
+  <!-- SECTION: LIVE ALERT TICKER BAR -->
   <div class="bg-red-950/80 border-b border-red-500/30 overflow-hidden text-xs py-1.5 text-red-200">
     <div class="max-w-6xl mx-auto flex items-center px-4">
       <div class="flex items-center gap-1.5 font-bold uppercase text-[11px] bg-red-600/30 text-red-300 px-2 py-0.5 rounded border border-red-500/40 mr-3 shrink-0">
@@ -70,9 +112,7 @@
     </div>
   </div>
 
-  <!-- ========================================== -->
-  <!-- SECTION 1: HEADER & NAVIGATION             -->
-  <!-- ========================================== -->
+  <!-- SECTION: HEADER & NAVIGATION -->
   <header class="border-b border-frost-700/50 bg-frost-800/80 backdrop-blur sticky top-0 z-40">
     <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3">
@@ -92,7 +132,7 @@
   </header>
 
   <!-- ========================================== -->
-  <!-- SECTION 2: MAIN DASHBOARD LAYOUT           -->
+  <!-- SECTION: MAIN DASHBOARD LAYOUT             -->
   <!-- ========================================== -->
   <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
 
@@ -203,7 +243,7 @@
 
     </div>
 
-    <!-- Evidence & Chat Logs Grid (Initially Hidden or Toggled) -->
+    <!-- Evidence & Chat Logs Grid -->
     <div id="section-evidence-view" class="hidden space-y-4">
       <div class="bg-frost-800/40 border border-frost-700/50 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -224,7 +264,7 @@
   </main>
 
   <!-- ========================================== -->
-  <!-- SECTION 3: MODAL - UPLOAD & REPORT FORM    -->
+  <!-- SECTION: MODAL - UPLOAD & REPORT FORM     -->
   <!-- ========================================== -->
   <div id="upload-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-frost-800 border border-frost-700 rounded-xl max-w-lg w-full overflow-hidden shadow-2xl">
@@ -378,7 +418,7 @@
   </div>
 
   <!-- ========================================== -->
-  <!-- SECTION 4: FOOTER & BRANDING              -->
+  <!-- SECTION: FOOTER & BRANDING                 -->
   <!-- ========================================== -->
   <footer class="border-t border-frost-700/50 bg-frost-900/90 py-6 mt-auto">
     <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
@@ -388,9 +428,9 @@
         <a href="mailto:asktechdadtech@gmail.com" class="hover:text-frost-accent transition-colors">asktechdadtech@gmail.com</a>
       </div>
       <div class="flex items-center gap-4">
-        <button id="btn-reset-data" class="hover:text-amber-400 text-slate-400 transition-colors flex items-center gap-1 cursor-pointer" title="Reset local storage back to default sample logs">
+        <button id="btn-reset-data" class="hover:text-amber-400 text-slate-400 transition-colors flex items-center gap-1 cursor-pointer" title="Reset Firestore data back to default sample logs">
           <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-          <span>Reset Sample Data</span>
+          <span>Reset Cloud Data</span>
         </button>
         <a href="https://asktechdad.com" target="_blank" rel="noopener noreferrer" class="hover:text-frost-accent transition-colors">asktechdad.com</a>
         <a href="https://ko-fi.com" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30 px-3 py-1 rounded-full font-medium transition-all">
@@ -402,7 +442,7 @@
   </footer>
 
   <!-- ========================================== -->
-  <!-- SECTION 5: APP LOGIC & MOCK OCR ENGINE    -->
+  <!-- SECTION: APPLICATION LOGIC & FIREBASE SYNC -->
   <!-- ========================================== -->
   <script>
     // Initialize Lucide Icons
@@ -414,32 +454,30 @@
     let pendingAdminAction = null; // { type: 'edit' | 'delete', logId: string }
     let editingLogId = null;
 
-    // Central Registry for Player ID Alias Tracking
-    const playerRegistry = {
+    // Local Memory Cache synced with Firestore
+    let players = {
       '84920138': {
-        currentName: 'AOWºACE',
-        currentTag: 'VOR',
-        historicalNames: ['AOWºACE', 'Viper_Old'],
-        historicalAlliances: ['VOR', 'BAD']
+        primaryName: 'AOWºACE',
+        primaryTag: 'VOR',
+        knownAliases: ['AOWºACE', 'Viper_Old', 'ShadowRaid']
       },
       '92018411': {
-        currentName: 'AOWºLucifer',
-        currentTag: 'VOR',
-        historicalNames: ['AOWºLucifer', 'ShadowBlade'],
-        historicalAlliances: ['VOR', 'BAD']
+        primaryName: 'AOWºLucifer',
+        primaryTag: 'VOR',
+        knownAliases: ['AOWºLucifer', 'ShadowBlade']
       },
       '61029388': {
-        currentName: 'FrostyChaos',
-        currentTag: 'NONE',
-        historicalNames: ['FrostyChaos'],
-        historicalAlliances: ['NONE']
+        primaryName: 'FrostyChaos',
+        primaryTag: 'NONE',
+        knownAliases: ['FrostyChaos']
       }
     };
 
-    // Default Initial Sample Attack Logs (Fallback dataset)
+    let attackLogs = [];
+
+    // Fallback Default Initial Attack Logs
     const defaultAttackLogs = [
       {
-        id: "log-001",
         state: 4336,
         attackerId: "84920138",
         attackerTag: "VOR",
@@ -452,10 +490,10 @@
         losses: 45000,
         outcome: "Defeat",
         timestamp: "2026-09-17 17:34:01",
-        evidenceNote: "Targeted at coordinates (X:393, Y:802) during state gathering."
+        evidenceNote: "Targeted at coordinates (X:393, Y:802) during state gathering.",
+        createdAt: Date.now() - 1000000
       },
       {
-        id: "log-002",
         state: 4336,
         attackerId: "92018411",
         attackerTag: "VOR",
@@ -468,10 +506,10 @@
         losses: 120000,
         outcome: "Defeat",
         timestamp: "2026-09-17 17:33:52",
-        evidenceNote: "Follow-up rally hit on Lil Spicy Willy at (X:393, Y:802)."
+        evidenceNote: "Follow-up rally hit on Lil Spicy Willy at (X:393, Y:802).",
+        createdAt: Date.now() - 900000
       },
       {
-        id: "log-003",
         state: 4336,
         attackerId: "84920138",
         attackerTag: "VOR",
@@ -484,10 +522,10 @@
         losses: 68000,
         outcome: "Defeat",
         timestamp: "2026-09-17 18:10:22",
-        evidenceNote: "Unprovoked burn on Mimi during resource gathering."
+        evidenceNote: "Unprovoked burn on Mimi during resource gathering.",
+        createdAt: Date.now() - 800000
       },
       {
-        id: "log-004",
         state: 4336,
         attackerId: "92018411",
         attackerTag: "VOR",
@@ -500,10 +538,10 @@
         losses: 95000,
         outcome: "Defeat",
         timestamp: "2026-09-17 19:05:40",
-        evidenceNote: "Solo hit on MinelsssTwo base."
+        evidenceNote: "Solo hit on MinelsssTwo base.",
+        createdAt: Date.now() - 700000
       },
       {
-        id: "log-005",
         state: 4336,
         attackerId: "84920138",
         attackerTag: "VOR",
@@ -516,10 +554,10 @@
         losses: 54000,
         outcome: "Defeat",
         timestamp: "2026-09-17 20:15:11",
-        evidenceNote: "Rogue attack logged against moweeee."
+        evidenceNote: "Rogue attack logged against moweeee.",
+        createdAt: Date.now() - 600000
       },
       {
-        id: "log-006",
         state: 4336,
         attackerId: "92018411",
         attackerTag: "VOR",
@@ -532,10 +570,10 @@
         losses: 110000,
         outcome: "Defeat",
         timestamp: "2026-09-17 21:02:00",
-        evidenceNote: "Targeted burn on Marta."
+        evidenceNote: "Targeted burn on Marta.",
+        createdAt: Date.now() - 500000
       },
       {
-        id: "log-007",
         state: 4336,
         attackerId: "61029388",
         attackerTag: "NONE",
@@ -548,35 +586,135 @@
         losses: 85000,
         outcome: "Defeat",
         timestamp: "2026-09-17 21:33:14",
-        evidenceNote: "Attack logged against VOR Alliance HQ at (X:366, Y:776)."
+        evidenceNote: "Attack logged against VOR Alliance HQ at (X:366, Y:776).",
+        createdAt: Date.now() - 400000
       }
     ];
 
-    // Load attack logs from browser localStorage or default array
-    function loadAttackLogs() {
-      const stored = localStorage.getItem('wos_attack_logs');
-      if (stored) {
-        try {
-          return JSON.parse(stored);
-        } catch (e) {
-          console.error("Failed to parse stored logs from localStorage", e);
+    // Helper: Lookup player record by ID
+    function getPlayer(id) {
+      return players[id] || { primaryName: 'Unknown', primaryTag: 'NONE', knownAliases: [] };
+    }
+
+    // Core Relational Player Management: Updates primary IGN/tag and accumulates historical aliases
+    function getOrCreatePlayer(playerId, rawName, allianceTag) {
+      if (!playerId) return null;
+      const cleanName = rawName ? rawName.trim() : 'Unknown';
+      const cleanTag = allianceTag ? allianceTag.toUpperCase().trim() : 'NONE';
+
+      if (!players[playerId]) {
+        players[playerId] = {
+          primaryName: cleanName,
+          primaryTag: cleanTag,
+          knownAliases: cleanName !== 'Unknown' ? [cleanName] : []
+        };
+      } else {
+        const p = players[playerId];
+        if (cleanName && cleanName !== 'Unknown') {
+          p.primaryName = cleanName; // Update primary IGN to most recently logged name
+          if (!p.knownAliases.includes(cleanName)) {
+            p.knownAliases.push(cleanName); // Append new alias without duplicates
+          }
+        }
+        if (cleanTag && cleanTag !== 'NONE') {
+          p.primaryTag = cleanTag; // Update primary alliance tag
         }
       }
-      return [...defaultAttackLogs];
+      return players[playerId];
     }
 
-    let attackLogs = loadAttackLogs();
+    // Helper function to get strict Firestore paths per Rule 1: /artifacts/{appId}/public/data/{collectionName}
+    function getFirestoreCol(collectionName) {
+      const fb = window.WOS_FIREBASE;
+      if (!fb) return null;
+      return fb.collection(fb.db, 'artifacts', fb.appId, 'public', 'data', collectionName);
+    }
 
-    // Persist active state to localStorage
-    function saveAttackLogs() {
+    function getFirestoreDoc(collectionName, docId) {
+      const fb = window.WOS_FIREBASE;
+      if (!fb) return null;
+      return fb.doc(fb.db, 'artifacts', fb.appId, 'public', 'data', collectionName, docId);
+    }
+
+    // Initialize Firestore Auth and Snapshot Listeners
+    async function initFirestoreSync() {
+      const fb = window.WOS_FIREBASE;
+      if (!fb) return;
+
       try {
-        localStorage.setItem('wos_attack_logs', JSON.stringify(attackLogs));
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await fb.signInWithCustomToken(fb.auth, __initial_auth_token);
+        } else {
+          await fb.signInAnonymously(fb.auth);
+        }
+
+        const user = fb.auth.currentUser;
+        if (!user) return;
+
+        // Listener for Attack Logs Collection
+        fb.onSnapshot(getFirestoreCol('attackLogs'), (snapshot) => {
+          const logs = [];
+          snapshot.forEach(docSnap => {
+            logs.push({ id: docSnap.id, ...docSnap.data() });
+          });
+
+          if (logs.length === 0) {
+            seedDefaultFirestoreData();
+          } else {
+            // Rule 2: Sort in JavaScript memory
+            attackLogs = logs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            renderApp();
+          }
+        }, (error) => {
+          console.error("Firestore AttackLogs Listener Error:", error);
+        });
+
+        // Listener for Master Players Registry Collection
+        fb.onSnapshot(getFirestoreCol('players'), (snapshot) => {
+          snapshot.forEach(docSnap => {
+            players[docSnap.id] = docSnap.data();
+          });
+          renderApp();
+        }, (error) => {
+          console.error("Firestore Players Listener Error:", error);
+        });
+
       } catch (e) {
-        console.error("Failed to save logs to localStorage", e);
+        console.error("Firebase Authentication/Sync Error:", e);
       }
     }
 
-    // SECTION: OCR Parser Logic & Sanitization
+    // Seed default dataset if Firestore collection is empty
+    async function seedDefaultFirestoreData() {
+      const fb = window.WOS_FIREBASE;
+      if (!fb || !fb.auth.currentUser) return;
+
+      // Seed players
+      for (const [pId, pData] of Object.entries(players)) {
+        await fb.setDoc(getFirestoreDoc('players', pId), pData, { merge: true });
+      }
+
+      // Seed logs
+      for (const log of defaultAttackLogs) {
+        await fb.addDoc(getFirestoreCol('attackLogs'), log);
+      }
+    }
+
+    // Update Player Registry in Firestore
+    async function updatePlayerRegistry(id, name, tag) {
+      if (!id) return;
+      const updatedPlayer = getOrCreatePlayer(id, name, tag);
+
+      const fb = window.WOS_FIREBASE;
+      if (fb && fb.auth.currentUser && updatedPlayer) {
+        try {
+          await fb.setDoc(getFirestoreDoc('players', id), updatedPlayer, { merge: true });
+        } catch (e) {
+          console.error("Failed to sync player to Firestore:", e);
+        }
+      }
+    }
+
     function normalizeUnicodeText(text) {
       if (!text) return '';
       let normalized = text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
@@ -605,24 +743,6 @@
       };
     }
 
-    function updatePlayerRegistry(id, name, tag) {
-      if (!id) return;
-      if (!playerRegistry[id]) {
-        playerRegistry[id] = {
-          currentName: name,
-          currentTag: tag,
-          historicalNames: [name],
-          historicalAlliances: [tag]
-        };
-      } else {
-        const reg = playerRegistry[id];
-        reg.currentName = name;
-        reg.currentTag = tag;
-        if (!reg.historicalNames.includes(name)) reg.historicalNames.push(name);
-        if (!reg.historicalAlliances.includes(tag)) reg.historicalAlliances.push(tag);
-      }
-    }
-
     function renderApp() {
       const searchInput = document.getElementById('feed-search');
       const evidenceSearchInput = document.getElementById('evidence-search');
@@ -641,11 +761,11 @@
       const query = filter.toLowerCase();
 
       const filtered = attackLogs.filter(log => 
-        log.attackerTag.toLowerCase().includes(query) ||
-        log.attackerName.toLowerCase().includes(query) ||
-        log.attackerId.toLowerCase().includes(query) ||
-        log.victimTag.toLowerCase().includes(query) ||
-        log.victimName.toLowerCase().includes(query)
+        (log.attackerTag && log.attackerTag.toLowerCase().includes(query)) ||
+        (log.attackerName && log.attackerName.toLowerCase().includes(query)) ||
+        (log.attackerId && log.attackerId.toLowerCase().includes(query)) ||
+        (log.victimTag && log.victimTag.toLowerCase().includes(query)) ||
+        (log.victimName && log.victimName.toLowerCase().includes(query))
       );
 
       if (filtered.length === 0) {
@@ -655,10 +775,12 @@
 
       filtered.forEach(log => {
         const isDefeat = log.outcome === 'Defeat';
-        const reg = playerRegistry[log.attackerId] || { historicalNames: [log.attackerName], historicalAlliances: [log.attackerTag] };
-        const pastNamesCount = reg.historicalNames.length;
-        const pastNamesList = reg.historicalNames.join(', ');
-        const pastTagsList = reg.historicalAlliances.map(t => `[${t}]`).join(', ');
+        const player = getPlayer(log.attackerId);
+        const attackerName = player.primaryName !== 'Unknown' ? player.primaryName : log.attackerName;
+        const attackerTag = (player.primaryTag && player.primaryTag !== 'NONE') ? player.primaryTag : log.attackerTag;
+        const aliases = (player.knownAliases && player.knownAliases.length > 0) ? player.knownAliases : [log.attackerName];
+        const aliasList = aliases.join(', ');
+        const showAka = aliases.length > 1;
 
         const card = document.createElement('div');
         card.className = 'p-3.5 bg-frost-900/60 border border-frost-700/60 rounded-lg flex flex-col gap-2.5';
@@ -671,13 +793,13 @@
               </div>
               <div>
                 <div class="text-sm font-semibold text-slate-100 flex items-center gap-1.5 flex-wrap">
-                  <span class="text-red-400">[${log.attackerTag}] ${log.attackerName}</span>
+                  <span class="text-red-400">[${attackerTag}] ${attackerName}</span>
                   <span class="text-[10px] font-mono bg-frost-800 text-slate-400 px-1.5 py-0.5 rounded border border-frost-700">ID: #${log.attackerId}</span>
                   <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-slate-500"></i>
                   <span class="text-sky-300">[${log.victimTag}] ${log.victimName}</span>
                 </div>
                 <div class="text-xs text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
-                  <span>Casualties: <strong class="text-slate-200 font-medium">${log.losses.toLocaleString()} troops</strong></span>
+                  <span>Casualties: <strong class="text-slate-200 font-medium">${(log.losses || 0).toLocaleString()} troops</strong></span>
                   ${log.victimCoords ? `<span>•</span><span class="text-amber-300/90 font-mono text-[11px]">📍 (${log.victimCoords})</span>` : ''}
                   <span>•</span>
                   <span>State #${log.state}</span>
@@ -687,7 +809,7 @@
 
             <!-- Card Timestamp & Admin Actions -->
             <div class="flex items-center gap-3 self-end sm:self-center">
-              <span class="text-xs text-slate-500 font-mono">${log.timestamp}</span>
+              <span class="text-xs text-slate-500 font-mono">${log.timestamp || 'Recent'}</span>
               <div class="flex items-center gap-1 border-l border-frost-700/60 pl-2">
                 <button onclick="handleTriggerEdit('${log.id}')" title="Edit Log" class="p-1.5 hover:bg-frost-700/80 text-slate-400 hover:text-amber-400 rounded-lg transition-colors cursor-pointer">
                   <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
@@ -699,12 +821,12 @@
             </div>
           </div>
 
-          <!-- Alias & History Badge Banner -->
+          <!-- Relational Bouncing Aliases Badge Banner -->
           <div class="flex items-center justify-between pt-2 border-t border-frost-700/30 text-[11px]">
-            <div class="flex items-center gap-1.5 text-slate-400" title="Past Known IGNs: ${pastNamesList} | Past Tags: ${pastTagsList}">
-              <i data-lucide="history" class="w-3.5 h-3.5 text-amber-400"></i>
-              <span>Aliases (${pastNamesCount}):</span>
-              <span class="text-amber-300/90 font-medium">${pastNamesList}</span>
+            <div class="flex items-center gap-1.5 text-slate-400" title="Historical Player IGNs: ${aliasList}">
+              <i data-lucide="history" class="w-3.5 h-3.5 ${showAka ? 'text-amber-400' : 'text-slate-500'}"></i>
+              <span class="font-medium">${showAka ? 'AKA / Bouncing Aliases' : 'Known IGNs'} (${aliases.length}):</span>
+              <span class="${showAka ? 'text-amber-300/90 font-semibold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20' : 'text-slate-300'}">${aliasList}</span>
             </div>
             ${log.evidenceNote ? `
               <span class="text-frost-accent flex items-center gap-1 text-[10px] bg-frost-accent/10 px-2 py-0.5 rounded border border-frost-accent/20">
@@ -729,10 +851,10 @@
       if (badge) badge.innerText = logsWithEvidence.length;
 
       const filtered = logsWithEvidence.filter(log => 
-        log.attackerName.toLowerCase().includes(query) ||
-        log.attackerTag.toLowerCase().includes(query) ||
-        log.attackerId.toLowerCase().includes(query) ||
-        log.evidenceNote.toLowerCase().includes(query)
+        (log.attackerName && log.attackerName.toLowerCase().includes(query)) ||
+        (log.attackerTag && log.attackerTag.toLowerCase().includes(query)) ||
+        (log.attackerId && log.attackerId.toLowerCase().includes(query)) ||
+        (log.evidenceNote && log.evidenceNote.toLowerCase().includes(query))
       );
 
       if (filtered.length === 0) {
@@ -741,7 +863,8 @@
       }
 
       filtered.forEach(log => {
-        const reg = playerRegistry[log.attackerId] || { historicalNames: [log.attackerName] };
+        const player = getPlayer(log.attackerId);
+        const aliases = player.knownAliases.length > 0 ? player.knownAliases : [log.attackerName];
         const card = document.createElement('div');
         card.className = 'p-4 bg-frost-800/40 border border-frost-700/60 rounded-xl space-y-3 flex flex-col justify-between';
         
@@ -749,10 +872,10 @@
           <div>
             <div class="flex items-center justify-between gap-2 mb-2">
               <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs font-bold">[${log.attackerTag}] ${log.attackerName}</span>
+                <span class="px-2 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs font-bold">[${log.attackerTag}] ${player.primaryName || log.attackerName}</span>
                 <span class="text-[10px] font-mono text-slate-400 bg-frost-900 px-1.5 py-0.5 rounded">ID: #${log.attackerId}</span>
               </div>
-              <span class="text-[11px] text-slate-500">${log.timestamp}</span>
+              <span class="text-[11px] text-slate-500">${log.timestamp || 'Recent'}</span>
             </div>
             
             <div class="p-3 bg-frost-900/80 rounded-lg border border-frost-700/50 text-xs text-slate-200 italic leading-relaxed">
@@ -762,7 +885,7 @@
 
           <div class="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-frost-700/40">
             <span>Target: <strong class="text-sky-300">[${log.victimTag}] ${log.victimName}</strong></span>
-            <span class="text-amber-400 text-[10px] bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">Known IGNs: ${reg.historicalNames.join(', ')}</span>
+            <span class="text-amber-400 text-[10px] bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">Known IGNs: ${aliases.join(', ')}</span>
           </div>
         `;
         evidenceGrid.appendChild(card);
@@ -773,11 +896,16 @@
     function renderTicker() {
       const tickerContent = document.getElementById('ticker-content');
       if (!tickerContent) return;
+      if (attackLogs.length === 0) {
+        tickerContent.innerHTML = '<span>No recent attacks reported yet in State #4336.</span>';
+        return;
+      }
+
       const items = attackLogs.map(l => {
-        const reg = playerRegistry[l.attackerId];
-        const aliasCount = reg ? reg.historicalNames.length : 1;
+        const player = getPlayer(l.attackerId);
+        const aliasCount = player.knownAliases.length || 1;
         return `
-          <span>🚨 <strong class="text-red-400">[${l.attackerTag}] ${l.attackerName}</strong> (ID: #${l.attackerId} • ${aliasCount} Known Aliases) attacked <strong class="text-sky-300">[${l.victimTag}] ${l.victimName}</strong> in State #${l.state}</span>
+          <span>🚨 <strong class="text-red-400">[${l.attackerTag}] ${player.primaryName || l.attackerName}</strong> (ID: #${l.attackerId} • ${aliasCount} Known Aliases) attacked <strong class="text-sky-300">[${l.victimTag}] ${l.victimName}</strong> in State #${l.state}</span>
         `;
       });
       tickerContent.innerHTML = [...items, ...items].join('<span class="text-frost-700 px-2">•</span>');
@@ -792,8 +920,8 @@
       const victims = {};
 
       attackLogs.forEach(log => {
-        aggressors[log.attackerTag] = (aggressors[log.attackerTag] || 0) + 1;
-        victims[log.victimTag] = (victims[log.victimTag] || 0) + 1;
+        if (log.attackerTag) aggressors[log.attackerTag] = (aggressors[log.attackerTag] || 0) + 1;
+        if (log.victimTag) victims[log.victimTag] = (victims[log.victimTag] || 0) + 1;
       });
 
       aggressorBoard.innerHTML = Object.entries(aggressors)
@@ -823,7 +951,7 @@
 
       if (statTotalAttacks) statTotalAttacks.innerText = attackLogs.length;
       
-      const totalCasualties = attackLogs.reduce((sum, l) => sum + Number(l.losses), 0);
+      const totalCasualties = attackLogs.reduce((sum, l) => sum + Number(l.losses || 0), 0);
       if (statTotalCasualties) {
         statTotalCasualties.innerText = totalCasualties > 1000 
           ? (totalCasualties / 1000).toFixed(1) + 'K' 
@@ -833,8 +961,8 @@
       const aggCounts = {};
       const vicCounts = {};
       attackLogs.forEach(l => {
-        aggCounts[l.attackerTag] = (aggCounts[l.attackerTag] || 0) + 1;
-        vicCounts[l.victimTag] = (vicCounts[l.victimTag] || 0) + 1;
+        if (l.attackerTag) aggCounts[l.attackerTag] = (aggCounts[l.attackerTag] || 0) + 1;
+        if (l.victimTag) vicCounts[l.victimTag] = (vicCounts[l.victimTag] || 0) + 1;
       });
 
       const topAgg = Object.keys(aggCounts).reduce((a, b) => aggCounts[a] > aggCounts[b] ? a : b, '');
@@ -844,7 +972,6 @@
       if (statTopVictim) statTopVictim.innerText = topVic ? `[${topVic}]` : 'N/A';
     }
 
-    // Admin Passcode & Trigger Functions
     function openPasscodeModal() {
       const modal = document.getElementById('admin-passcode-modal');
       const input = document.getElementById('input-admin-passcode');
@@ -909,13 +1036,21 @@
       lucide.createIcons();
     }
 
-    function executeDeleteLog(logId) {
-      attackLogs = attackLogs.filter(l => l.id !== logId);
-      saveAttackLogs();
-      renderApp();
+    async function executeDeleteLog(logId) {
+      const fb = window.WOS_FIREBASE;
+      if (fb && fb.auth.currentUser) {
+        try {
+          await fb.deleteDoc(getFirestoreDoc('attackLogs', logId));
+        } catch (e) {
+          console.error("Failed to delete log from Firestore:", e);
+        }
+      }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      // Start Firebase Sync
+      initFirestoreSync();
+
       const btnOpenUpload = document.getElementById('btnOpenUpload');
       const btnCloseModal = document.getElementById('btn-close-modal');
       const uploadModal = document.getElementById('upload-modal');
@@ -930,13 +1065,32 @@
       const attackForm = document.getElementById('attack-form');
       const btnResetData = document.getElementById('btn-reset-data');
 
-      // Reset Sample Data Handler
+      // View Tab Controls
+      const viewTabCombat = document.getElementById('view-tab-combat');
+      const viewTabEvidence = document.getElementById('view-tab-evidence');
+      const sectionCombatView = document.getElementById('section-combat-view');
+      const sectionEvidenceView = document.getElementById('section-evidence-view');
+
+      if (viewTabCombat && viewTabEvidence && sectionCombatView && sectionEvidenceView) {
+        viewTabCombat.addEventListener('click', () => {
+          viewTabCombat.className = 'px-4 py-2 text-xs font-bold rounded-lg bg-frost-accent text-frost-900 flex items-center gap-2 cursor-pointer transition-all';
+          viewTabEvidence.className = 'px-4 py-2 text-xs font-bold rounded-lg text-slate-400 hover:text-white hover:bg-frost-800 flex items-center gap-2 cursor-pointer transition-all';
+          sectionCombatView.classList.remove('hidden');
+          sectionEvidenceView.classList.add('hidden');
+        });
+
+        viewTabEvidence.addEventListener('click', () => {
+          viewTabEvidence.className = 'px-4 py-2 text-xs font-bold rounded-lg bg-frost-accent text-frost-900 flex items-center gap-2 cursor-pointer transition-all';
+          viewTabCombat.className = 'px-4 py-2 text-xs font-bold rounded-lg text-slate-400 hover:text-white hover:bg-frost-800 flex items-center gap-2 cursor-pointer transition-all';
+          sectionEvidenceView.classList.remove('hidden');
+          sectionCombatView.classList.add('hidden');
+        });
+      }
+
+      // Reset Cloud Data Handler
       if (btnResetData) {
-        btnResetData.addEventListener('click', () => {
-          localStorage.removeItem('wos_attack_logs');
-          attackLogs = JSON.parse(JSON.stringify(defaultAttackLogs));
-          attackLogs.forEach(l => updatePlayerRegistry(l.attackerId, l.attackerName, l.attackerTag));
-          renderApp();
+        btnResetData.addEventListener('click', async () => {
+          await seedDefaultFirestoreData();
         });
       }
 
@@ -947,7 +1101,7 @@
       const inputPasscode = document.getElementById('input-admin-passcode');
       const errPasscode = document.getElementById('admin-passcode-error');
 
-      // Admin Passcode Event Handlers
+      // Admin Passcode Handlers
       if (btnSubmitAdmin) {
         btnSubmitAdmin.addEventListener('click', () => {
           const val = inputPasscode ? inputPasscode.value.trim() : '';
@@ -1019,9 +1173,9 @@
         fileInput.addEventListener('change', handleFileUpload);
       }
 
-      // Form Submission logic (Handles both create & edit)
+      // Form Submission Logic (Create & Edit using Firestore)
       if (attackForm) {
-        attackForm.addEventListener('submit', (e) => {
+        attackForm.addEventListener('submit', async (e) => {
           e.preventDefault();
           
           const attackerId = document.getElementById('input-attacker-id').value.trim();
@@ -1029,56 +1183,47 @@
           const attackerTag = document.getElementById('input-attacker-tag').value.toUpperCase().trim();
           const victimTag = document.getElementById('input-victim-tag').value.toUpperCase().trim();
 
-          updatePlayerRegistry(attackerId, attackerName, attackerTag);
+          await updatePlayerRegistry(attackerId, attackerName, attackerTag);
 
-          if (editingLogId) {
-            const index = attackLogs.findIndex(l => l.id === editingLogId);
-            if (index !== -1) {
-              attackLogs[index] = {
-                ...attackLogs[index],
-                state: parseInt(document.getElementById('input-state').value || 4336),
-                attackerId: attackerId,
-                attackerTag: attackerTag,
-                attackerName: attackerName,
-                victimId: document.getElementById('input-victim-id').value.trim() || 'N/A',
-                victimTag: victimTag,
-                victimAlliance: victimTag,
-                victimName: document.getElementById('input-victim-name').value.trim(),
-                losses: parseInt(document.getElementById('input-losses').value || 0),
-                outcome: document.getElementById('input-outcome').value,
-                evidenceNote: document.getElementById('input-evidence-note').value.trim() || null
-              };
+          const fb = window.WOS_FIREBASE;
+          const logPayload = {
+            state: parseInt(document.getElementById('input-state').value || 4336),
+            attackerId: attackerId,
+            attackerTag: attackerTag,
+            attackerName: attackerName,
+            victimId: document.getElementById('input-victim-id').value.trim() || 'N/A',
+            victimTag: victimTag,
+            victimAlliance: victimTag,
+            victimName: document.getElementById('input-victim-name').value.trim(),
+            losses: parseInt(document.getElementById('input-losses').value || 0),
+            outcome: document.getElementById('input-outcome').value,
+            evidenceNote: document.getElementById('input-evidence-note').value.trim() || null,
+            timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+            createdAt: Date.now()
+          };
+
+          if (editingLogId && fb) {
+            try {
+              await fb.updateDoc(getFirestoreDoc('attackLogs', editingLogId), logPayload);
+            } catch (err) {
+              console.error("Failed to update log in Firestore:", err);
             }
             editingLogId = null;
-          } else {
-            const newLog = {
-              id: 'log-' + Date.now(),
-              state: parseInt(document.getElementById('input-state').value || 4336),
-              attackerId: attackerId,
-              attackerTag: attackerTag,
-              attackerName: attackerName,
-              victimId: document.getElementById('input-victim-id').value.trim() || 'N/A',
-              victimTag: victimTag,
-              victimAlliance: victimTag,
-              victimName: document.getElementById('input-victim-name').value.trim(),
-              losses: parseInt(document.getElementById('input-losses').value || 0),
-              outcome: document.getElementById('input-outcome').value,
-              evidenceNote: document.getElementById('input-evidence-note').value.trim() || null,
-              timestamp: 'Just now'
-            };
-            attackLogs.unshift(newLog);
+          } else if (fb) {
+            try {
+              await fb.addDoc(getFirestoreCol('attackLogs'), logPayload);
+            } catch (err) {
+              console.error("Failed to add log to Firestore:", err);
+            }
           }
 
-          saveAttackLogs();
-          renderApp();
-          
           attackForm.reset();
           if (verifiedPreview) verifiedPreview.classList.add('hidden');
           if (uploadModal) uploadModal.classList.add('hidden');
         });
       }
 
-      // Initial execution after DOM load
+      // Initial local render pass
       renderApp();
     });
 
