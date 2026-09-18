@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WOS Attack Logger - State Intelligence</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            frost: {
+              900: '#0b1329',
+              800: '#131f3f',
+              700: '#1c2d5a',
+              600: '#283e78',
+              500: '#3a569c',
+              accent: '#38bdf8',
+              danger: '#ef4444'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <style>
+    @keyframes ticker {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .animate-ticker {
+      display: flex;
+      width: max-content;
+      animation: ticker 28s linear infinite;
+    }
+    .animate-ticker:hover {
+      animation-play-state: paused;
+    }
+  </style>
+</head>
+<body class="bg-frost-900 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+
+  <!-- ========================================== -->
+  <!-- DEMO PREVIEW NOTICE BANNER                -->
+  <!-- ========================================== -->
+  <div class="bg-amber-950/90 border-b border-amber-500/30 text-amber-200 text-xs py-1.5 px-4 text-center font-medium">
+    <span>⚡ DEMO PREVIEW MODE: OCR uploads & card edits are saved locally in your browser for testing. Live server sync coming soon!</span>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- SECTION 0: LIVE ALERT TICKER BAR           -->
+  <!-- ========================================== -->
+  <div class="bg-red-950/80 border-b border-red-500/30 overflow-hidden text-xs py-1.5 text-red-200">
+    <div class="max-w-6xl mx-auto flex items-center px-4">
+      <div class="flex items-center gap-1.5 font-bold uppercase text-[11px] bg-red-600/30 text-red-300 px-2 py-0.5 rounded border border-red-500/40 mr-3 shrink-0">
+        <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+        <span>Intel Ticker</span>
+      </div>
+      <div class="overflow-hidden relative w-full">
+        <div id="ticker-content" class="animate-ticker space-x-8 font-mono text-[11px]">
+          <!-- Dynamic Ticker Alerts Injected Here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- SECTION 1: HEADER & NAVIGATION             -->
+  <!-- ========================================== -->
+  <header class="border-b border-frost-700/50 bg-frost-800/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="p-2 bg-frost-accent/10 text-frost-accent rounded-lg border border-frost-accent/20">
+          <i data-lucide="shield-alert" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg leading-none text-white tracking-wide">WOS State Intel</h1>
+          <p class="text-xs text-slate-400 mt-0.5">Rogue Alliance Attack Tracker</p>
+        </div>
+      </div>
+      <button id="btnOpenUpload" class="bg-frost-accent hover:bg-sky-400 text-frost-900 font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-all shadow-lg shadow-frost-accent/10 cursor-pointer">
+        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+        <span>Report Attack</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================== -->
+  <!-- SECTION 2: MAIN DASHBOARD LAYOUT           -->
+  <!-- ========================================== -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
+
+    <!-- Overview Stats Banner -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-frost-800/50 border border-frost-700/50 p-4 rounded-xl flex items-center gap-4">
+        <div class="p-3 bg-red-500/10 text-red-400 rounded-lg border border-red-500/20">
+          <i data-lucide="swords" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Total Attacks</div>
+          <div id="stat-total-attacks" class="text-2xl font-bold text-white">0</div>
+        </div>
+      </div>
+
+      <div class="bg-frost-800/50 border border-frost-700/50 p-4 rounded-xl flex items-center gap-4">
+        <div class="p-3 bg-orange-500/10 text-orange-400 rounded-lg border border-orange-500/20">
+          <i data-lucide="skull" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Troop Losses</div>
+          <div id="stat-total-casualties" class="text-2xl font-bold text-white">0</div>
+        </div>
+      </div>
+
+      <div class="bg-frost-800/50 border border-frost-700/50 p-4 rounded-xl flex items-center gap-4">
+        <div class="p-3 bg-amber-500/10 text-amber-400 rounded-lg border border-amber-500/20">
+          <i data-lucide="crown" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Top Aggressor</div>
+          <div id="stat-top-aggressor" class="text-xl font-bold text-red-400">N/A</div>
+        </div>
+      </div>
+
+      <div class="bg-frost-800/50 border border-frost-700/50 p-4 rounded-xl flex items-center gap-4">
+        <div class="p-3 bg-frost-accent/10 text-frost-accent rounded-lg border border-frost-accent/20">
+          <i data-lucide="shield" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Most Targeted</div>
+          <div id="stat-top-victim" class="text-xl font-bold text-sky-300">N/A</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Navigation Tabs -->
+    <div class="flex items-center justify-between border-b border-frost-700/50 pb-2">
+      <div class="flex gap-2">
+        <button id="view-tab-combat" class="px-4 py-2 text-xs font-bold rounded-lg bg-frost-accent text-frost-900 flex items-center gap-2 cursor-pointer transition-all">
+          <i data-lucide="swords" class="w-4 h-4"></i>
+          <span>Combat Feed & Stats</span>
+        </button>
+        <button id="view-tab-evidence" class="px-4 py-2 text-xs font-bold rounded-lg text-slate-400 hover:text-white hover:bg-frost-800 flex items-center gap-2 cursor-pointer transition-all">
+          <i data-lucide="message-square-quote" class="w-4 h-4"></i>
+          <span>Evidence & Chat Logs</span>
+          <span id="evidence-count-badge" class="bg-frost-700 text-frost-accent px-1.5 py-0.5 rounded-full text-[10px]">0</span>
+        </button>
+      </div>
+      <span class="text-xs text-slate-400 hidden sm:inline-block">State Filter: <strong class="text-frost-accent">State #4336</strong></span>
+    </div>
+
+    <!-- Analytics & Feed Layout Grid -->
+    <div id="section-combat-view" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Leaderboards (Sidebar) -->
+      <div class="space-y-6">
+        <!-- Rogue Aggressors Breakdown -->
+        <div class="bg-frost-800/40 border border-frost-700/50 rounded-xl p-4">
+          <h3 class="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+            <i data-lucide="flame" class="w-4 h-4 text-red-400"></i>
+            Top Attacking Alliances
+          </h3>
+          <div id="aggressor-leaderboard" class="space-y-2">
+            <!-- Dynamic Injected Content -->
+          </div>
+        </div>
+
+        <!-- Targeted Alliances Breakdown -->
+        <div class="bg-frost-800/40 border border-frost-700/50 rounded-xl p-4">
+          <h3 class="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+            <i data-lucide="shield-off" class="w-4 h-4 text-sky-400"></i>
+            Targeted Victim Alliances
+          </h3>
+          <div id="victim-leaderboard" class="space-y-2">
+            <!-- Dynamic Injected Content -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Combat Feed -->
+      <div class="lg:col-span-2 bg-frost-800/40 border border-frost-700/50 rounded-xl p-4 flex flex-col">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-frost-700/50">
+          <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <i data-lucide="list-filter" class="w-4 h-4 text-frost-accent"></i>
+            Recent Combat Reports
+          </h3>
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <input type="text" id="feed-search" placeholder="Search Tag, Name, Player ID..." class="bg-frost-900/80 border border-frost-700 text-xs text-slate-200 px-3 py-2 rounded-lg w-full sm:w-60 focus:outline-none focus:border-frost-accent">
+          </div>
+        </div>
+
+        <!-- Log List -->
+        <div id="combat-feed" class="space-y-3 flex-1 overflow-y-auto max-h-[550px] pr-1">
+          <!-- Dynamic Injected Content -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Evidence & Chat Logs Grid (Initially Hidden or Toggled) -->
+    <div id="section-evidence-view" class="hidden space-y-4">
+      <div class="bg-frost-800/40 border border-frost-700/50 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="font-bold text-white text-base flex items-center gap-2">
+            <i data-lucide="file-text" class="w-5 h-5 text-frost-accent"></i>
+            Community Evidence & Chat Transcripts
+          </h3>
+          <p class="text-xs text-slate-400 mt-1">Verified world chat threats, coordinates, and player ID alias paper trails.</p>
+        </div>
+        <input type="text" id="evidence-search" placeholder="Search evidence notes or IDs..." class="bg-frost-900/80 border border-frost-700 text-xs text-slate-200 px-3 py-2 rounded-lg w-full sm:w-64 focus:outline-none focus:border-frost-accent">
+      </div>
+
+      <div id="evidence-feed-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Dynamic Evidence Cards Injected Here -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- SECTION 3: MODAL - UPLOAD & REPORT FORM    -->
+  <!-- ========================================== -->
+  <div id="upload-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-frost-800 border border-frost-700 rounded-xl max-w-lg w-full overflow-hidden shadow-2xl">
+      
+      <!-- Modal Header -->
+      <div class="px-5 py-4 border-b border-frost-700 flex items-center justify-between">
+        <h3 id="modal-form-title" class="font-bold text-white flex items-center gap-2">
+          <i data-lucide="upload-cloud" class="w-5 h-5 text-frost-accent"></i>
+          Submit Battle Report
+        </h3>
+        <button id="btn-close-modal" class="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-5 space-y-4">
+
+        <!-- Mode Selection Tabs -->
+        <div id="upload-mode-tabs" class="flex bg-frost-900/60 p-1 rounded-lg border border-frost-700">
+          <button id="tab-ocr" type="button" class="flex-1 py-1.5 text-xs font-semibold rounded-md bg-frost-accent text-frost-900 transition-all cursor-pointer">Screenshot (OCR)</button>
+          <button id="tab-manual" type="button" class="flex-1 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white transition-all cursor-pointer">Manual Entry</button>
+        </div>
+
+        <!-- OCR Drag & Drop Zone -->
+        <div id="view-ocr" class="space-y-4">
+          <div id="drop-zone" class="border-2 border-dashed border-frost-700 hover:border-frost-accent rounded-xl p-6 text-center cursor-pointer transition-colors bg-frost-900/30 flex flex-col items-center justify-center gap-2">
+            <i data-lucide="image-plus" class="w-10 h-10 text-slate-400"></i>
+            <div class="text-sm text-slate-200">
+              <span class="font-semibold text-frost-accent">Tap to upload</span> or drag screenshot here
+            </div>
+            <p class="text-xs text-slate-500">Supports PNG, JPG (WOS Battle/Scout Logs)</p>
+            <input type="file" id="file-input" accept="image/*" class="hidden">
+          </div>
+
+          <!-- Processing State Spinner -->
+          <div id="ocr-loading" class="hidden p-4 bg-frost-900/50 rounded-lg border border-frost-700 text-center space-y-2">
+            <div class="inline-block animate-spin rounded-full h-6 w-6 border-2 border-frost-accent border-t-transparent"></div>
+            <p class="text-xs text-slate-300 font-medium">Parsing screenshot via Cloudflare Worker & Google Vision OCR...</p>
+          </div>
+        </div>
+
+        <!-- Attack Log Verification / Input Form -->
+        <form id="attack-form" class="space-y-3">
+          <div id="verified-preview" class="hidden p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs text-emerald-400 flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-4 h-4"></i> OCR Extracted Data</span>
+            <span class="text-slate-400 italic">Verify or tweak fields below</span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">State #</label>
+              <input type="number" id="input-state" value="4336" required class="w-full bg-frost-900 border border-frost-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-frost-accent">
+            </div>
+            <div class="col-span-2">
+              <label class="block text-xs font-medium text-slate-400 mb-1">Attacker Player ID (Numeric)</label>
+              <input type="text" id="input-attacker-id" placeholder="e.g. 84920138" required class="w-full bg-frost-900 border border-frost-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-frost-accent font-mono">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Attacker Tag</label>
+              <input type="text" id="input-attacker-tag" placeholder="e.g. BAD" required class="w-full bg-frost-900 border border-frost-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-frost-accent">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Attacker Current IGN</label>
+              <input type="text" id="input-attacker-name" placeholder="e.g. RoguePlayer" required class="w-full bg-frost-900 border border-frost-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-frost-accent">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Victim Tag</label>
+              <input type="text" id="input-victim-tag" placeholder="e.g. ASS" value="ASS" required class="w-full bg-frost-900 border border-frost-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-frost-accent">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Victim Name</label>
+              <input type="text" id="input-victim-name" placeholder="e.g. FriendlyPlayer" required class="w-full bg-frost-900 border border-frost-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-frost-accent">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Victim ID (Opt)</label>
+              <input type="text" id="input-victim-id" placeholder="e.g. 77210944" class="w-full bg-frost-900 border border-frost-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-frost-accent font-mono">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Troop Casualties</label>
+              <input type="number" id="input-losses" placeholder="e.g. 25000" class="w-full bg-frost-900 border border-frost-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-frost-accent">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Outcome</label>
+              <select id="input-outcome" class="w-full bg-frost-900 border border-frost-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-frost-accent">
+                <option value="Defeat">Victim Defeated (Burned)</option>
+                <option value="Victory">Victim Defended</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Evidence / Chat Note (Optional)</label>
+            <textarea id="input-evidence-note" rows="2" placeholder="Paste chat threats, target coordinates (X, Y), or context notes..." class="w-full bg-frost-900 border border-frost-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-frost-accent"></textarea>
+          </div>
+
+          <button id="btn-submit-attack-form" type="submit" class="w-full bg-frost-accent hover:bg-sky-400 text-frost-900 font-bold py-2.5 rounded-lg text-sm transition-all mt-2 shadow-lg shadow-frost-accent/20 cursor-pointer">
+            Publish Attack Log
+          </button>
+        </form>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- PASSCODE VERIFICATION MODAL -->
+  <div id="admin-passcode-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-frost-800 border border-frost-700 rounded-xl max-w-sm w-full overflow-hidden shadow-2xl p-5 space-y-4">
+      <div class="flex items-center justify-between border-b border-frost-700 pb-3">
+        <h3 class="font-bold text-white flex items-center gap-2 text-sm">
+          <i data-lucide="lock" class="w-4 h-4 text-amber-400"></i>
+          Admin Passcode Required
+        </h3>
+        <button id="btn-close-admin-modal" class="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <p class="text-xs text-slate-300">Enter the administrative passcode to perform edit or delete operations on combat logs.</p>
+        
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Passcode</label>
+          <input type="password" id="input-admin-passcode" placeholder="Enter passcode..." class="w-full bg-frost-900 border border-frost-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-frost-accent font-mono">
+        </div>
+
+        <div id="admin-passcode-error" class="hidden text-xs text-red-400 font-semibold bg-red-500/10 border border-red-500/20 p-2 rounded flex items-center gap-1.5">
+          <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+          <span>Invalid Passcode</span>
+        </div>
+
+        <div class="flex gap-2 pt-1">
+          <button id="btn-cancel-admin" type="button" class="flex-1 bg-frost-700 hover:bg-frost-600 text-slate-200 font-semibold py-2 rounded-lg text-xs transition-all cursor-pointer">
+            Cancel
+          </button>
+          <button id="btn-submit-admin" type="button" class="flex-1 bg-amber-500 hover:bg-amber-400 text-frost-900 font-bold py-2 rounded-lg text-xs transition-all cursor-pointer">
+            Unlock & Proceed
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- SECTION 4: FOOTER & BRANDING              -->
+  <!-- ========================================== -->
+  <footer class="border-t border-frost-700/50 bg-frost-900/90 py-6 mt-auto">
+    <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+      <div class="flex items-center gap-2">
+        <span>Built by <strong class="text-slate-200">Ask_TechDad</strong></span>
+        <span>•</span>
+        <a href="mailto:asktechdadtech@gmail.com" class="hover:text-frost-accent transition-colors">asktechdadtech@gmail.com</a>
+      </div>
+      <div class="flex items-center gap-4">
+        <button id="btn-reset-data" class="hover:text-amber-400 text-slate-400 transition-colors flex items-center gap-1 cursor-pointer" title="Reset local storage back to default sample logs">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span>Reset Sample Data</span>
+        </button>
+        <a href="https://asktechdad.com" target="_blank" rel="noopener noreferrer" class="hover:text-frost-accent transition-colors">asktechdad.com</a>
+        <a href="https://ko-fi.com" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30 px-3 py-1 rounded-full font-medium transition-all">
+          <i data-lucide="coffee" class="w-3.5 h-3.5"></i>
+          <span>Support on Ko-fi</span>
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ========================================== -->
+  <!-- SECTION 5: APP LOGIC & MOCK OCR ENGINE    -->
+  <!-- ========================================== -->
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // Admin Security & Passcode Configuration
+    const ADMIN_PASSCODE = "WOS2026";
+    let isAdminUnlocked = false;
+    let pendingAdminAction = null; // { type: 'edit' | 'delete', logId: string }
+    let editingLogId = null;
+
+    // Central Registry for Player ID Alias Tracking
+    const playerRegistry = {
+      '84920138': {
+        currentName: 'AOWºACE',
+        currentTag: 'VOR',
+        historicalNames: ['AOWºACE', 'Viper_Old'],
+        historicalAlliances: ['VOR', 'BAD']
+      },
+      '92018411': {
+        currentName: 'AOWºLucifer',
+        currentTag: 'VOR',
+        historicalNames: ['AOWºLucifer', 'ShadowBlade'],
+        historicalAlliances: ['VOR', 'BAD']
+      },
+      '61029388': {
+        currentName: 'FrostyChaos',
+        currentTag: 'NONE',
+        historicalNames: ['FrostyChaos'],
+        historicalAlliances: ['NONE']
+      }
+    };
+
+    // Default Initial Sample Attack Logs (Fallback dataset)
+    const defaultAttackLogs = [
+      {
+        id: "log-001",
+        state: 4336,
+        attackerId: "84920138",
+        attackerTag: "VOR",
+        attackerName: "AOWºACE",
+        victimId: "77210944",
+        victimTag: "ASS",
+        victimAlliance: "ASS",
+        victimName: "Lil Spicy Willy",
+        victimCoords: "393, 802",
+        losses: 45000,
+        outcome: "Defeat",
+        timestamp: "2026-09-17 17:34:01",
+        evidenceNote: "Targeted at coordinates (X:393, Y:802) during state gathering."
+      },
+      {
+        id: "log-002",
+        state: 4336,
+        attackerId: "92018411",
+        attackerTag: "VOR",
+        attackerName: "AOWºLucifer",
+        victimId: "77210944",
+        victimTag: "ASS",
+        victimAlliance: "ASS",
+        victimName: "Lil Spicy Willy",
+        victimCoords: "393, 802",
+        losses: 120000,
+        outcome: "Defeat",
+        timestamp: "2026-09-17 17:33:52",
+        evidenceNote: "Follow-up rally hit on Lil Spicy Willy at (X:393, Y:802)."
+      },
+      {
+        id: "log-003",
+        state: 4336,
+        attackerId: "84920138",
+        attackerTag: "VOR",
+        attackerName: "AOWºACE",
+        victimId: "77210945",
+        victimTag: "ASS",
+        victimAlliance: "ASS",
+        victimName: "Mimi",
+        victimCoords: "395, 804",
+        losses: 68000,
+        outcome: "Defeat",
+        timestamp: "2026-09-17 18:10:22",
+        evidenceNote: "Unprovoked burn on Mimi during resource gathering."
+      },
+      {
+        id: "log-004",
+        state: 4336,
+        attackerId: "92018411",
+        attackerTag: "VOR",
+        attackerName: "AOWºLucifer",
+        victimId: "77210946",
+        victimTag: "ASS",
+        victimAlliance: "ASS",
+        victimName: "MinelsssTwo",
+        victimCoords: "391, 798",
+        losses: 95000,
+        outcome: "Defeat",
+        timestamp: "2026-09-17 19:05:40",
+        evidenceNote: "Solo hit on MinelsssTwo base."
+      },
+      {
+        id: "log-005",
+        state: 4336,
+        attackerId: "84920138",
+        attackerTag: "VOR",
+        attackerName: "AOWºACE",
+        victimId: "77210947",
+        victimTag: "ASS",
+        victimAlliance: "ASS",
+        victimName: "moweeee",
+        victimCoords: "388, 810",
+        losses: 54000,
+        outcome: "Defeat",
+        timestamp: "2026-09-17 20:15:11",
+        evidenceNote: "Rogue attack logged against moweeee."
+      },
+      {
+        id: "log-006",
+        state: 4336,
+        attackerId: "92018411",
+        attackerTag: "VOR",
+        attackerName: "AOWºLucifer",
+        victimId: "77210948",
+        victimTag: "ASS",
+        victimAlliance: "ASS",
+        victimName: "Marta",
+        victimCoords: "390, 805",
+        losses: 110000,
+        outcome: "Defeat",
+        timestamp: "2026-09-17 21:02:00",
+        evidenceNote: "Targeted burn on Marta."
+      },
+      {
+        id: "log-007",
+        state: 4336,
+        attackerId: "61029388",
+        attackerTag: "NONE",
+        attackerName: "FrostyChaos",
+        victimId: "33910284",
+        victimTag: "ASS",
+        victimAlliance: "ASS",
+        victimName: "VOR Alliance HQ",
+        victimCoords: "366, 776",
+        losses: 85000,
+        outcome: "Defeat",
+        timestamp: "2026-09-17 21:33:14",
+        evidenceNote: "Attack logged against VOR Alliance HQ at (X:366, Y:776)."
+      }
+    ];
+
+    // Load attack logs from browser localStorage or default array
+    function loadAttackLogs() {
+      const stored = localStorage.getItem('wos_attack_logs');
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch (e) {
+          console.error("Failed to parse stored logs from localStorage", e);
+        }
+      }
+      return [...defaultAttackLogs];
+    }
+
+    let attackLogs = loadAttackLogs();
+
+    // Persist active state to localStorage
+    function saveAttackLogs() {
+      try {
+        localStorage.setItem('wos_attack_logs', JSON.stringify(attackLogs));
+      } catch (e) {
+        console.error("Failed to save logs to localStorage", e);
+      }
+    }
+
+    // SECTION: OCR Parser Logic & Sanitization
+    function normalizeUnicodeText(text) {
+      if (!text) return '';
+      let normalized = text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+      normalized = normalized.replace(/º/g, '°').replace(/[^\x00-\x7F]/g, '');
+      return normalized.trim() || text;
+    }
+
+    function parseBattleReportOCR(rawText) {
+      const tagMatch = rawText.match(/\[([A-Z0-9]{3,4})\]/i);
+      const extractedTag = tagMatch ? tagMatch[1].toUpperCase() : null;
+
+      const coordsMatch = rawText.match(/(?:X:\s*(\d+)\s*,\s*Y:\s*(\d+))|(?:(\d{2,4})\s*,\s*(\d{2,4}))/i);
+      let extractedCoords = null;
+      if (coordsMatch) {
+        if (coordsMatch[1] && coordsMatch[2]) {
+          extractedCoords = `${coordsMatch[1]}, ${coordsMatch[2]}`;
+        } else if (coordsMatch[3] && coordsMatch[4]) {
+          extractedCoords = `${coordsMatch[3]}, ${coordsMatch[4]}`;
+        }
+      }
+
+      return {
+        tag: extractedTag,
+        coords: extractedCoords,
+        normalizedText: normalizeUnicodeText(rawText)
+      };
+    }
+
+    function updatePlayerRegistry(id, name, tag) {
+      if (!id) return;
+      if (!playerRegistry[id]) {
+        playerRegistry[id] = {
+          currentName: name,
+          currentTag: tag,
+          historicalNames: [name],
+          historicalAlliances: [tag]
+        };
+      } else {
+        const reg = playerRegistry[id];
+        reg.currentName = name;
+        reg.currentTag = tag;
+        if (!reg.historicalNames.includes(name)) reg.historicalNames.push(name);
+        if (!reg.historicalAlliances.includes(tag)) reg.historicalAlliances.push(tag);
+      }
+    }
+
+    function renderApp() {
+      const searchInput = document.getElementById('feed-search');
+      const evidenceSearchInput = document.getElementById('evidence-search');
+      renderFeed(searchInput ? searchInput.value : '');
+      renderEvidenceFeed(evidenceSearchInput ? evidenceSearchInput.value : '');
+      renderLeaderboards();
+      renderStats();
+      renderTicker();
+    }
+
+    // Render Recent Combat Feed with Edit & Delete Actions
+    function renderFeed(filter = '') {
+      const feedContainer = document.getElementById('combat-feed');
+      if (!feedContainer) return;
+      feedContainer.innerHTML = '';
+      const query = filter.toLowerCase();
+
+      const filtered = attackLogs.filter(log => 
+        log.attackerTag.toLowerCase().includes(query) ||
+        log.attackerName.toLowerCase().includes(query) ||
+        log.attackerId.toLowerCase().includes(query) ||
+        log.victimTag.toLowerCase().includes(query) ||
+        log.victimName.toLowerCase().includes(query)
+      );
+
+      if (filtered.length === 0) {
+        feedContainer.innerHTML = `<div class="text-center py-8 text-slate-500 text-xs">No attack logs matched your query.</div>`;
+        return;
+      }
+
+      filtered.forEach(log => {
+        const isDefeat = log.outcome === 'Defeat';
+        const reg = playerRegistry[log.attackerId] || { historicalNames: [log.attackerName], historicalAlliances: [log.attackerTag] };
+        const pastNamesCount = reg.historicalNames.length;
+        const pastNamesList = reg.historicalNames.join(', ');
+        const pastTagsList = reg.historicalAlliances.map(t => `[${t}]`).join(', ');
+
+        const card = document.createElement('div');
+        card.className = 'p-3.5 bg-frost-900/60 border border-frost-700/60 rounded-lg flex flex-col gap-2.5';
+        
+        card.innerHTML = `
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <div class="flex items-center gap-3">
+              <div class="px-2 py-1 rounded text-[11px] font-bold ${isDefeat ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
+                ${isDefeat ? 'BURNED' : 'DEFENDED'}
+              </div>
+              <div>
+                <div class="text-sm font-semibold text-slate-100 flex items-center gap-1.5 flex-wrap">
+                  <span class="text-red-400">[${log.attackerTag}] ${log.attackerName}</span>
+                  <span class="text-[10px] font-mono bg-frost-800 text-slate-400 px-1.5 py-0.5 rounded border border-frost-700">ID: #${log.attackerId}</span>
+                  <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-slate-500"></i>
+                  <span class="text-sky-300">[${log.victimTag}] ${log.victimName}</span>
+                </div>
+                <div class="text-xs text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
+                  <span>Casualties: <strong class="text-slate-200 font-medium">${log.losses.toLocaleString()} troops</strong></span>
+                  ${log.victimCoords ? `<span>•</span><span class="text-amber-300/90 font-mono text-[11px]">📍 (${log.victimCoords})</span>` : ''}
+                  <span>•</span>
+                  <span>State #${log.state}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card Timestamp & Admin Actions -->
+            <div class="flex items-center gap-3 self-end sm:self-center">
+              <span class="text-xs text-slate-500 font-mono">${log.timestamp}</span>
+              <div class="flex items-center gap-1 border-l border-frost-700/60 pl-2">
+                <button onclick="handleTriggerEdit('${log.id}')" title="Edit Log" class="p-1.5 hover:bg-frost-700/80 text-slate-400 hover:text-amber-400 rounded-lg transition-colors cursor-pointer">
+                  <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="handleTriggerDelete('${log.id}')" title="Delete Log" class="p-1.5 hover:bg-frost-700/80 text-slate-400 hover:text-red-400 rounded-lg transition-colors cursor-pointer">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alias & History Badge Banner -->
+          <div class="flex items-center justify-between pt-2 border-t border-frost-700/30 text-[11px]">
+            <div class="flex items-center gap-1.5 text-slate-400" title="Past Known IGNs: ${pastNamesList} | Past Tags: ${pastTagsList}">
+              <i data-lucide="history" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>Aliases (${pastNamesCount}):</span>
+              <span class="text-amber-300/90 font-medium">${pastNamesList}</span>
+            </div>
+            ${log.evidenceNote ? `
+              <span class="text-frost-accent flex items-center gap-1 text-[10px] bg-frost-accent/10 px-2 py-0.5 rounded border border-frost-accent/20">
+                <i data-lucide="file-check" class="w-3 h-3"></i> Has Evidence Note
+              </span>
+            ` : ''}
+          </div>
+        `;
+        feedContainer.appendChild(card);
+      });
+      lucide.createIcons();
+    }
+
+    function renderEvidenceFeed(filter = '') {
+      const evidenceGrid = document.getElementById('evidence-feed-grid');
+      if (!evidenceGrid) return;
+      evidenceGrid.innerHTML = '';
+      const query = filter.toLowerCase();
+
+      const logsWithEvidence = attackLogs.filter(l => l.evidenceNote);
+      const badge = document.getElementById('evidence-count-badge');
+      if (badge) badge.innerText = logsWithEvidence.length;
+
+      const filtered = logsWithEvidence.filter(log => 
+        log.attackerName.toLowerCase().includes(query) ||
+        log.attackerTag.toLowerCase().includes(query) ||
+        log.attackerId.toLowerCase().includes(query) ||
+        log.evidenceNote.toLowerCase().includes(query)
+      );
+
+      if (filtered.length === 0) {
+        evidenceGrid.innerHTML = `<div class="col-span-2 text-center py-8 text-slate-500 text-xs">No evidence notes matched your search query.</div>`;
+        return;
+      }
+
+      filtered.forEach(log => {
+        const reg = playerRegistry[log.attackerId] || { historicalNames: [log.attackerName] };
+        const card = document.createElement('div');
+        card.className = 'p-4 bg-frost-800/40 border border-frost-700/60 rounded-xl space-y-3 flex flex-col justify-between';
+        
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs font-bold">[${log.attackerTag}] ${log.attackerName}</span>
+                <span class="text-[10px] font-mono text-slate-400 bg-frost-900 px-1.5 py-0.5 rounded">ID: #${log.attackerId}</span>
+              </div>
+              <span class="text-[11px] text-slate-500">${log.timestamp}</span>
+            </div>
+            
+            <div class="p-3 bg-frost-900/80 rounded-lg border border-frost-700/50 text-xs text-slate-200 italic leading-relaxed">
+              "${log.evidenceNote}"
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-frost-700/40">
+            <span>Target: <strong class="text-sky-300">[${log.victimTag}] ${log.victimName}</strong></span>
+            <span class="text-amber-400 text-[10px] bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">Known IGNs: ${reg.historicalNames.join(', ')}</span>
+          </div>
+        `;
+        evidenceGrid.appendChild(card);
+      });
+      lucide.createIcons();
+    }
+
+    function renderTicker() {
+      const tickerContent = document.getElementById('ticker-content');
+      if (!tickerContent) return;
+      const items = attackLogs.map(l => {
+        const reg = playerRegistry[l.attackerId];
+        const aliasCount = reg ? reg.historicalNames.length : 1;
+        return `
+          <span>🚨 <strong class="text-red-400">[${l.attackerTag}] ${l.attackerName}</strong> (ID: #${l.attackerId} • ${aliasCount} Known Aliases) attacked <strong class="text-sky-300">[${l.victimTag}] ${l.victimName}</strong> in State #${l.state}</span>
+        `;
+      });
+      tickerContent.innerHTML = [...items, ...items].join('<span class="text-frost-700 px-2">•</span>');
+    }
+
+    function renderLeaderboards() {
+      const aggressorBoard = document.getElementById('aggressor-leaderboard');
+      const victimBoard = document.getElementById('victim-leaderboard');
+      if (!aggressorBoard || !victimBoard) return;
+
+      const aggressors = {};
+      const victims = {};
+
+      attackLogs.forEach(log => {
+        aggressors[log.attackerTag] = (aggressors[log.attackerTag] || 0) + 1;
+        victims[log.victimTag] = (victims[log.victimTag] || 0) + 1;
+      });
+
+      aggressorBoard.innerHTML = Object.entries(aggressors)
+        .sort((a,b) => b[1] - a[1])
+        .map(([tag, count]) => `
+          <div class="flex items-center justify-between p-2 bg-frost-900/40 rounded border border-frost-700/30 text-xs">
+            <span class="font-bold text-red-400">[${tag}]</span>
+            <span class="text-slate-300 font-medium">${count} attack${count > 1 ? 's' : ''}</span>
+          </div>
+        `).join('') || '<p class="text-xs text-slate-500">No data</p>';
+
+      victimBoard.innerHTML = Object.entries(victims)
+        .sort((a,b) => b[1] - a[1])
+        .map(([tag, count]) => `
+          <div class="flex items-center justify-between p-2 bg-frost-900/40 rounded border border-frost-700/30 text-xs">
+            <span class="font-bold text-sky-300">[${tag}]</span>
+            <span class="text-slate-300 font-medium">${count} hit${count > 1 ? 's' : ''} taken</span>
+          </div>
+        `).join('') || '<p class="text-xs text-slate-500">No data</p>';
+    }
+
+    function renderStats() {
+      const statTotalAttacks = document.getElementById('stat-total-attacks');
+      const statTotalCasualties = document.getElementById('stat-total-casualties');
+      const statTopAggressor = document.getElementById('stat-top-aggressor');
+      const statTopVictim = document.getElementById('stat-top-victim');
+
+      if (statTotalAttacks) statTotalAttacks.innerText = attackLogs.length;
+      
+      const totalCasualties = attackLogs.reduce((sum, l) => sum + Number(l.losses), 0);
+      if (statTotalCasualties) {
+        statTotalCasualties.innerText = totalCasualties > 1000 
+          ? (totalCasualties / 1000).toFixed(1) + 'K' 
+          : totalCasualties;
+      }
+
+      const aggCounts = {};
+      const vicCounts = {};
+      attackLogs.forEach(l => {
+        aggCounts[l.attackerTag] = (aggCounts[l.attackerTag] || 0) + 1;
+        vicCounts[l.victimTag] = (vicCounts[l.victimTag] || 0) + 1;
+      });
+
+      const topAgg = Object.keys(aggCounts).reduce((a, b) => aggCounts[a] > aggCounts[b] ? a : b, '');
+      const topVic = Object.keys(vicCounts).reduce((a, b) => vicCounts[a] > vicCounts[b] ? a : b, '');
+
+      if (statTopAggressor) statTopAggressor.innerText = topAgg ? `[${topAgg}]` : 'N/A';
+      if (statTopVictim) statTopVictim.innerText = topVic ? `[${topVic}]` : 'N/A';
+    }
+
+    // Admin Passcode & Trigger Functions
+    function openPasscodeModal() {
+      const modal = document.getElementById('admin-passcode-modal');
+      const input = document.getElementById('input-admin-passcode');
+      const err = document.getElementById('admin-passcode-error');
+      if (modal) {
+        if (input) input.value = '';
+        if (err) err.classList.add('hidden');
+        modal.classList.remove('hidden');
+      }
+    }
+
+    function closePasscodeModal() {
+      const modal = document.getElementById('admin-passcode-modal');
+      if (modal) modal.classList.add('hidden');
+      pendingAdminAction = null;
+    }
+
+    function handleTriggerEdit(logId) {
+      if (!isAdminUnlocked) {
+        pendingAdminAction = { type: 'edit', id: logId };
+        openPasscodeModal();
+        return;
+      }
+      executeEditLog(logId);
+    }
+
+    function handleTriggerDelete(logId) {
+      if (!isAdminUnlocked) {
+        pendingAdminAction = { type: 'delete', id: logId };
+        openPasscodeModal();
+        return;
+      }
+      executeDeleteLog(logId);
+    }
+
+    function executeEditLog(logId) {
+      const log = attackLogs.find(l => l.id === logId);
+      if (!log) return;
+
+      editingLogId = logId;
+      document.getElementById('input-state').value = log.state;
+      document.getElementById('input-attacker-id').value = log.attackerId;
+      document.getElementById('input-attacker-tag').value = log.attackerTag;
+      document.getElementById('input-attacker-name').value = log.attackerName;
+      document.getElementById('input-victim-tag').value = log.victimTag;
+      document.getElementById('input-victim-name').value = log.victimName;
+      document.getElementById('input-victim-id').value = log.victimId || '';
+      document.getElementById('input-losses').value = log.losses;
+      document.getElementById('input-outcome').value = log.outcome;
+      document.getElementById('input-evidence-note').value = log.evidenceNote || '';
+
+      const modalTitle = document.getElementById('modal-form-title');
+      if (modalTitle) {
+        modalTitle.innerHTML = `<i data-lucide="pencil" class="w-5 h-5 text-amber-400"></i> Edit Battle Report`;
+      }
+      
+      const submitBtn = document.getElementById('btn-submit-attack-form');
+      if (submitBtn) submitBtn.innerText = 'Save Changes';
+
+      const uploadModal = document.getElementById('upload-modal');
+      if (uploadModal) uploadModal.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function executeDeleteLog(logId) {
+      attackLogs = attackLogs.filter(l => l.id !== logId);
+      saveAttackLogs();
+      renderApp();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const btnOpenUpload = document.getElementById('btnOpenUpload');
+      const btnCloseModal = document.getElementById('btn-close-modal');
+      const uploadModal = document.getElementById('upload-modal');
+      const searchInput = document.getElementById('feed-search');
+      const evidenceSearchInput = document.getElementById('evidence-search');
+      const tabOcr = document.getElementById('tab-ocr');
+      const tabManual = document.getElementById('tab-manual');
+      const viewOcr = document.getElementById('view-ocr');
+      const verifiedPreview = document.getElementById('verified-preview');
+      const dropZone = document.getElementById('drop-zone');
+      const fileInput = document.getElementById('file-input');
+      const attackForm = document.getElementById('attack-form');
+      const btnResetData = document.getElementById('btn-reset-data');
+
+      // Reset Sample Data Handler
+      if (btnResetData) {
+        btnResetData.addEventListener('click', () => {
+          localStorage.removeItem('wos_attack_logs');
+          attackLogs = JSON.parse(JSON.stringify(defaultAttackLogs));
+          attackLogs.forEach(l => updatePlayerRegistry(l.attackerId, l.attackerName, l.attackerTag));
+          renderApp();
+        });
+      }
+
+      // Passcode Modal Elements
+      const btnSubmitAdmin = document.getElementById('btn-submit-admin');
+      const btnCancelAdmin = document.getElementById('btn-cancel-admin');
+      const btnCloseAdminModal = document.getElementById('btn-close-admin-modal');
+      const inputPasscode = document.getElementById('input-admin-passcode');
+      const errPasscode = document.getElementById('admin-passcode-error');
+
+      // Admin Passcode Event Handlers
+      if (btnSubmitAdmin) {
+        btnSubmitAdmin.addEventListener('click', () => {
+          const val = inputPasscode ? inputPasscode.value.trim() : '';
+          if (val === ADMIN_PASSCODE) {
+            isAdminUnlocked = true;
+            if (errPasscode) errPasscode.classList.add('hidden');
+            const action = pendingAdminAction;
+            closePasscodeModal();
+
+            if (action) {
+              if (action.type === 'edit') executeEditLog(action.id);
+              if (action.type === 'delete') executeDeleteLog(action.id);
+            }
+          } else {
+            if (errPasscode) errPasscode.classList.remove('hidden');
+          }
+        });
+      }
+
+      if (btnCancelAdmin) btnCancelAdmin.addEventListener('click', closePasscodeModal);
+      if (btnCloseAdminModal) btnCloseAdminModal.addEventListener('click', closePasscodeModal);
+
+      // Main Modal Controls
+      if (btnOpenUpload && uploadModal) {
+        btnOpenUpload.addEventListener('click', () => {
+          editingLogId = null;
+          const modalTitle = document.getElementById('modal-form-title');
+          if (modalTitle) {
+            modalTitle.innerHTML = `<i data-lucide="upload-cloud" class="w-5 h-5 text-frost-accent"></i> Submit Battle Report`;
+          }
+          const submitBtn = document.getElementById('btn-submit-attack-form');
+          if (submitBtn) submitBtn.innerText = 'Publish Attack Log';
+          
+          attackForm.reset();
+          document.getElementById('input-state').value = 4336;
+          document.getElementById('input-victim-tag').value = 'ASS';
+          
+          uploadModal.classList.remove('hidden');
+          lucide.createIcons();
+        });
+      }
+
+      if (btnCloseModal && uploadModal) {
+        btnCloseModal.addEventListener('click', () => uploadModal.classList.add('hidden'));
+      }
+
+      if (searchInput) searchInput.addEventListener('input', (e) => renderFeed(e.target.value));
+      if (evidenceSearchInput) evidenceSearchInput.addEventListener('input', (e) => renderEvidenceFeed(e.target.value));
+
+      if (tabOcr) {
+        tabOcr.addEventListener('click', () => {
+          tabOcr.className = 'flex-1 py-1.5 text-xs font-semibold rounded-md bg-frost-accent text-frost-900 transition-all cursor-pointer';
+          if (tabManual) tabManual.className = 'flex-1 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white transition-all cursor-pointer';
+          if (viewOcr) viewOcr.classList.remove('hidden');
+        });
+      }
+
+      if (tabManual) {
+        tabManual.addEventListener('click', () => {
+          tabManual.className = 'flex-1 py-1.5 text-xs font-semibold rounded-md bg-frost-accent text-frost-900 transition-all cursor-pointer';
+          if (tabOcr) tabOcr.className = 'flex-1 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white transition-all cursor-pointer';
+          if (viewOcr) viewOcr.classList.add('hidden');
+          if (verifiedPreview) verifiedPreview.classList.add('hidden');
+        });
+      }
+
+      if (dropZone && fileInput) {
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileUpload);
+      }
+
+      // Form Submission logic (Handles both create & edit)
+      if (attackForm) {
+        attackForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          
+          const attackerId = document.getElementById('input-attacker-id').value.trim();
+          const attackerName = document.getElementById('input-attacker-name').value.trim();
+          const attackerTag = document.getElementById('input-attacker-tag').value.toUpperCase().trim();
+          const victimTag = document.getElementById('input-victim-tag').value.toUpperCase().trim();
+
+          updatePlayerRegistry(attackerId, attackerName, attackerTag);
+
+          if (editingLogId) {
+            const index = attackLogs.findIndex(l => l.id === editingLogId);
+            if (index !== -1) {
+              attackLogs[index] = {
+                ...attackLogs[index],
+                state: parseInt(document.getElementById('input-state').value || 4336),
+                attackerId: attackerId,
+                attackerTag: attackerTag,
+                attackerName: attackerName,
+                victimId: document.getElementById('input-victim-id').value.trim() || 'N/A',
+                victimTag: victimTag,
+                victimAlliance: victimTag,
+                victimName: document.getElementById('input-victim-name').value.trim(),
+                losses: parseInt(document.getElementById('input-losses').value || 0),
+                outcome: document.getElementById('input-outcome').value,
+                evidenceNote: document.getElementById('input-evidence-note').value.trim() || null
+              };
+            }
+            editingLogId = null;
+          } else {
+            const newLog = {
+              id: 'log-' + Date.now(),
+              state: parseInt(document.getElementById('input-state').value || 4336),
+              attackerId: attackerId,
+              attackerTag: attackerTag,
+              attackerName: attackerName,
+              victimId: document.getElementById('input-victim-id').value.trim() || 'N/A',
+              victimTag: victimTag,
+              victimAlliance: victimTag,
+              victimName: document.getElementById('input-victim-name').value.trim(),
+              losses: parseInt(document.getElementById('input-losses').value || 0),
+              outcome: document.getElementById('input-outcome').value,
+              evidenceNote: document.getElementById('input-evidence-note').value.trim() || null,
+              timestamp: 'Just now'
+            };
+            attackLogs.unshift(newLog);
+          }
+
+          saveAttackLogs();
+          renderApp();
+          
+          attackForm.reset();
+          if (verifiedPreview) verifiedPreview.classList.add('hidden');
+          if (uploadModal) uploadModal.classList.add('hidden');
+        });
+      }
+
+      // Initial execution after DOM load
+      renderApp();
+    });
+
+    // Mock Vision API / Cloudflare OCR Processor
+    function handleFileUpload() {
+      const fileInput = document.getElementById('file-input');
+      const ocrLoading = document.getElementById('ocr-loading');
+      const verifiedPreview = document.getElementById('verified-preview');
+      if (!fileInput || !fileInput.files.length) return;
+      
+      if (ocrLoading) ocrLoading.classList.remove('hidden');
+      
+      setTimeout(() => {
+        if (ocrLoading) ocrLoading.classList.add('hidden');
+        if (verifiedPreview) verifiedPreview.classList.remove('hidden');
+
+        const sampleOCRText = "[VOR] AOWºACE attacked Lil Spicy Willy at (X:393, Y:802)";
+        const parsed = parseBattleReportOCR(sampleOCRText);
+
+        document.getElementById('input-state').value = 4336;
+        document.getElementById('input-attacker-id').value = '84920138';
+        document.getElementById('input-attacker-tag').value = parsed.tag || 'VOR';
+        document.getElementById('input-attacker-name').value = 'AOWºACE';
+        document.getElementById('input-victim-tag').value = 'ASS';
+        document.getElementById('input-victim-name').value = 'Lil Spicy Willy';
+        document.getElementById('input-victim-id').value = '77210944';
+        document.getElementById('input-losses').value = 45000;
+        document.getElementById('input-outcome').value = 'Defeat';
+        document.getElementById('input-evidence-note').value = `Targeted at coordinates (X:${parsed.coords || '393, 802'})`;
+      }, 1400);
+    }
+  </script>
+</body>
+</html>
