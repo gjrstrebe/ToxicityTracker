@@ -783,7 +783,7 @@
       }
     }
 
-    // Client-Side Regex Parser with Clean Coordinate Separation & Full Victim Name Capture
+    // Client-Side Multi-Line Regex Parser with Clean Coordinate Separation & Full Victim Name Capture
     function parseRawTextToLogs(rawText) {
       if (!rawText || typeof rawText !== 'string') return [];
       const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -795,12 +795,51 @@
 
       let currentLog = null;
 
+      function cleanVictimString(str) {
+        if (!str) return '';
+        let cleaned = str;
+        // Remove parenthetical or isolated coordinate blocks
+        cleaned = cleaned.replace(/\(?\s*X[:\s]*\d+[\s,]+Y[:\s]*\d+\s*\)?/gi, '');
+        // Remove alliance tag if present inside victim string
+        cleaned = cleaned.replace(/\[[A-Za-z0-9]{2,5}\]/g, '');
+        // Strip trailing/leading punctuation or parenthesis remnants
+        cleaned = cleaned.replace(/[\(\)]/g, '').trim();
+        // Strip trailing "City" or "'s City"
+        cleaned = cleaned.replace(/(?:'s|\s+)?\s*City$/i, '').trim();
+        return cleaned;
+      }
+
+      function parseAttackerString(str) {
+        if (!str) return { tag: 'VOR', name: '' };
+        let tag = 'VOR';
+        let name = str;
+
+        // Match alliance tag [TAG]
+        const tagMatch = name.match(/\[([A-Za-z0-9]{2,5})\]/);
+        if (tagMatch) {
+          tag = tagMatch[1].toUpperCase();
+          name = name.replace(/\[.*?\]/g, '');
+        }
+
+        // Clean off trailing attack phrases like "'s mighty attack!", "'s attack!", "mighty attack!"
+        name = name.replace(/(?:'s|\s+)?\s*(?:mighty\s*)?attack!*$/i, '');
+        name = name.replace(/\s*attacked\s*$/i, '');
+        name = name.replace(coordsRegex, '');
+        name = name.replace(/[\(\)]/g, '').trim();
+
+        return { tag, name };
+      }
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const tsMatch = line.match(timestampRegex);
-        const hasFellTo = line.toLowerCase().includes('fell to') || line.toLowerCase().includes('attacked') || line.toLowerCase().includes('burned');
+        const hasAttackKeyword = line.toLowerCase().includes('fell to') || 
+                                 line.toLowerCase().includes('mighty attack') || 
+                                 line.toLowerCase().includes('attacked') || 
+                                 line.toLowerCase().includes('burned');
 
-        if (tsMatch || hasFellTo || (currentLog && currentLog.timestamp && line.match(/\[([A-Za-z0-9]{2,5})\]/))) {
+        // New log boundary trigger
+        if (tsMatch || hasAttackKeyword) {
           if (currentLog && (currentLog.attackerName || currentLog.victimName)) {
             logs.push(currentLog);
           }
@@ -837,76 +876,64 @@
           };
         }
 
+        // Coordinate extraction
         const coordsMatch = line.match(coordsRegex);
         if (coordsMatch) {
           currentLog.victimCoords = `X:${coordsMatch[1]}, Y:${coordsMatch[2]}`;
         }
 
+        // Troop losses extraction
         const lossMatch = line.match(powerLossRegex);
         if (lossMatch) {
           const parsedLoss = parseInt(lossMatch[1].replace(/,/g, ''), 10);
           if (!isNaN(parsedLoss)) currentLog.losses = parsedLoss;
         }
 
+        // Pattern 1: Multi-line / Single-line "fell to [VOR] Attacker's mighty attack!"
         if (line.toLowerCase().includes('fell to')) {
           const parts = line.split(/fell to/i);
 
-          // Left side = Victim
           if (parts[0]) {
-            let leftSide = parts[0];
-            const coordIdx = leftSide.search(coordsRegex);
-            if (coordIdx !== -1) {
-              leftSide = leftSide.substring(0, coordIdx);
-            }
-            const vTagMatch = leftSide.match(/\[([A-Za-z0-9]{2,5})\]/);
-            if (vTagMatch) {
-              currentLog.victimTag = vTagMatch[1].toUpperCase();
-            }
-            let vName = leftSide.replace(/\[.*?\]/g, '').replace(/[\(\)]/g, '').trim();
-            vName = vName.replace(/\s+City$/i, '').trim();
-            currentLog.victimName = vName || currentLog.victimName;
+            const vTagMatch = parts[0].match(/\[([A-Za-z0-9]{2,5})\]/);
+            if (vTagMatch) currentLog.victimTag = vTagMatch[1].toUpperCase();
+            currentLog.victimName = cleanVictimString(parts[0]) || currentLog.victimName;
           }
 
-          // Right side = Attacker
           if (parts[1]) {
-            let rightSide = parts[1];
-            const aTagMatch = rightSide.match(/\[([A-Za-z0-9]{2,5})\]/);
-            if (aTagMatch) {
-              currentLog.attackerTag = aTagMatch[1].toUpperCase();
-            }
-            let aName = rightSide.replace(/\[.*?\]/g, '').trim();
-            aName = aName.replace(coordsRegex, '').replace(/[\(\)]/g, '').trim();
-            currentLog.attackerName = aName || currentLog.attackerName;
+            const parsedAttacker = parseAttackerString(parts[1]);
+            if (parsedAttacker.tag) currentLog.attackerTag = parsedAttacker.tag;
+            if (parsedAttacker.name) currentLog.attackerName = parsedAttacker.name;
           }
-        } else if (line.toLowerCase().includes('attacked')) {
+        } 
+        // Pattern 2: Standalone attacker line ending with "'s mighty attack!"
+        else if (line.toLowerCase().includes('mighty attack')) {
+          const parsedAttacker = parseAttackerString(line);
+          if (parsedAttacker.tag) currentLog.attackerTag = parsedAttacker.tag;
+          if (parsedAttacker.name) currentLog.attackerName = parsedAttacker.name;
+        }
+        // Pattern 3: "Attacker attacked Victim"
+        else if (line.toLowerCase().includes('attacked')) {
           const parts = line.split(/attacked/i);
 
-          // Left side = Attacker
           if (parts[0]) {
-            let leftSide = parts[0];
-            const aTagMatch = leftSide.match(/\[([A-Za-z0-9]{2,5})\]/);
-            if (aTagMatch) {
-              currentLog.attackerTag = aTagMatch[1].toUpperCase();
-            }
-            let aName = leftSide.replace(/\[.*?\]/g, '').trim();
-            aName = aName.replace(coordsRegex, '').replace(/[\(\)]/g, '').trim();
-            currentLog.attackerName = aName || currentLog.attackerName;
+            const parsedAttacker = parseAttackerString(parts[0]);
+            if (parsedAttacker.tag) currentLog.attackerTag = parsedAttacker.tag;
+            if (parsedAttacker.name) currentLog.attackerName = parsedAttacker.name;
           }
 
-          // Right side = Victim
           if (parts[1]) {
-            let rightSide = parts[1];
-            const coordIdx = rightSide.search(coordsRegex);
-            if (coordIdx !== -1) {
-              rightSide = rightSide.substring(0, coordIdx);
-            }
-            const vTagMatch = rightSide.match(/\[([A-Za-z0-9]{2,5})\]/);
-            if (vTagMatch) {
-              currentLog.victimTag = vTagMatch[1].toUpperCase();
-            }
-            let vName = rightSide.replace(/\[.*?\]/g, '').replace(/[\(\)]/g, '').trim();
-            vName = vName.replace(/\s+City$/i, '').trim();
-            currentLog.victimName = vName || currentLog.victimName;
+            const vTagMatch = parts[1].match(/\[([A-Za-z0-9]{2,5})\]/);
+            if (vTagMatch) currentLog.victimTag = vTagMatch[1].toUpperCase();
+            currentLog.victimName = cleanVictimString(parts[1]) || currentLog.victimName;
+          }
+        }
+        // Pattern 4: Standalone Victim / City line
+        else if (coordsMatch || line.toLowerCase().includes('city')) {
+          if (!currentLog.victimName || currentLog.victimName === 'Unknown') {
+            const vTagMatch = line.match(/\[([A-Za-z0-9]{2,5})\]/);
+            if (vTagMatch) currentLog.victimTag = vTagMatch[1].toUpperCase();
+            const extractedVictim = cleanVictimString(line);
+            if (extractedVictim) currentLog.victimName = extractedVictim;
           }
         }
       }
