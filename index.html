@@ -62,7 +62,7 @@
   <!-- Firebase SDK Imports & Global Config Setup -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'wos-attack-logger-state-4336';
@@ -96,8 +96,7 @@
       writeBatch,
       onSnapshot,
       collection,
-      signInAnonymously,
-      signInWithCustomToken
+      signInAnonymously
     };
   </script>
 </head>
@@ -493,7 +492,7 @@
           Admin Security & Data Control
         </h3>
         <button id="btn-close-admin-modal" class="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer">
-          <i data-lucide="x" class="w-4 h-4"></i>
+          <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
@@ -681,6 +680,8 @@
       const log = attackLogs.find(l => l.id === id);
       if (!log) return;
       editingLogId = id;
+      window.parsedLogBatch = [];
+      window.currentBatchIndex = 0;
       
       const modalTitle = document.getElementById('modal-form-title');
       if (modalTitle) modalTitle.innerHTML = `<i data-lucide="edit-3" class="w-5 h-5 text-amber-400"></i> Edit Combat Log`;
@@ -699,6 +700,7 @@
       document.getElementById('input-evidence-note').value = log.evidenceNote || '';
 
       document.getElementById('batch-control-container')?.classList.add('hidden');
+      document.getElementById('ocr-badge-count')?.classList.add('hidden');
       document.getElementById('upload-modal')?.classList.remove('hidden');
       lucide.createIcons();
     }
@@ -781,7 +783,7 @@
       }
     }
 
-    // Client-Side Regex Parser with Clean Coordinate Separation
+    // Client-Side Regex Parser with Clean Coordinate Separation & Full Victim Name Capture
     function parseRawTextToLogs(rawText) {
       if (!rawText || typeof rawText !== 'string') return [];
       const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -814,7 +816,7 @@
             losses: 0,
             outcome: "Defeat",
             timestamp: tsMatch ? tsMatch[1] : new Date().toISOString().replace('T', ' ').substring(0, 19),
-            evidenceNote: "Gemini Vision OCR Scan"
+            evidenceNote: ""
           };
         }
 
@@ -831,7 +833,7 @@
             losses: 0,
             outcome: "Defeat",
             timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-            evidenceNote: "Gemini Vision OCR Scan"
+            evidenceNote: ""
           };
         }
 
@@ -858,8 +860,12 @@
         if (line.toLowerCase().includes('fell to')) {
           const parts = line.split(/fell to/i);
           if (parts[0]) {
-            let vName = parts[0].replace(/\[.*?\]/g, '').trim();
-            vName = vName.replace(coordsRegex, '').replace(/[\(\)]/g, '').trim();
+            let leftSide = parts[0];
+            const coordIdx = leftSide.search(coordsRegex);
+            if (coordIdx !== -1) {
+              leftSide = leftSide.substring(0, coordIdx);
+            }
+            let vName = leftSide.replace(/\[.*?\]/g, '').replace(/[\(\)]/g, '').trim();
             currentLog.victimName = vName || currentLog.victimName;
           }
           if (parts[1]) {
@@ -875,8 +881,12 @@
             currentLog.attackerName = aName || currentLog.attackerName;
           }
           if (parts[1]) {
-            let vName = parts[1].replace(/\[.*?\]/g, '').trim();
-            vName = vName.replace(coordsRegex, '').replace(/[\(\)]/g, '').trim();
+            let rightSide = parts[1];
+            const coordIdx = rightSide.search(coordsRegex);
+            if (coordIdx !== -1) {
+              rightSide = rightSide.substring(0, coordIdx);
+            }
+            let vName = rightSide.replace(/\[.*?\]/g, '').replace(/[\(\)]/g, '').trim();
             currentLog.victimName = vName || currentLog.victimName;
           }
         }
@@ -895,7 +905,7 @@
       if (loading) loading.classList.remove('hidden');
 
       try {
-        const promptText = `Extract ALL attack logs from this Whiteout Survival screenshot line by line. Do not skip repeating rows or collapse identical targets. Output raw text.`;
+        const promptText = `Extract ALL raw text from this screenshot line by line, from top to bottom. Do NOT summarize or skip repeating lines. Output pure raw text exactly as it appears on screen.`;
 
         const payload = {
           contents: [
@@ -1179,58 +1189,61 @@
       });
 
       // Granular Publish Current Log
-      document.getElementById('attack-form')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        window.syncCurrentFormToBatch();
+      const attackForm = document.getElementById('attack-form');
+      if (attackForm) {
+        attackForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          window.syncCurrentFormToBatch();
 
-        const fb = window.WOS_FIREBASE;
-        if (!fb) return;
+          const fb = window.WOS_FIREBASE;
+          if (!fb) return;
 
-        const attackerId = document.getElementById('input-attacker-id').value.trim();
-        const attackerTag = document.getElementById('input-attacker-tag').value.trim();
-        const attackerName = document.getElementById('input-attacker-name').value.trim();
+          const attackerId = document.getElementById('input-attacker-id').value.trim();
+          const attackerTag = document.getElementById('input-attacker-tag').value.trim();
+          const attackerName = document.getElementById('input-attacker-name').value.trim();
 
-        if (attackerId) {
-          getOrCreatePlayer(attackerId, attackerName, attackerTag);
-          await fb.setDoc(getFirestoreDoc('players', attackerId), players[attackerId], { merge: true });
-        }
+          if (attackerId) {
+            getOrCreatePlayer(attackerId, attackerName, attackerTag);
+            await fb.setDoc(getFirestoreDoc('players', attackerId), players[attackerId], { merge: true });
+          }
 
-        const logPayload = {
-          state: parseInt(document.getElementById('input-state').value) || 4336,
-          attackerId: attackerId,
-          attackerTag: attackerTag,
-          attackerName: attackerName,
-          victimTag: document.getElementById('input-victim-tag').value.trim(),
-          victimName: document.getElementById('input-victim-name').value.trim(),
-          victimCoords: document.getElementById('input-victim-coords').value.trim(),
-          losses: parseInt(document.getElementById('input-losses').value) || 0,
-          outcome: document.getElementById('input-outcome').value,
-          evidenceNote: document.getElementById('input-evidence-note').value.trim(),
-          timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19)
-        };
+          const logPayload = {
+            state: parseInt(document.getElementById('input-state').value) || 4336,
+            attackerId: attackerId,
+            attackerTag: attackerTag,
+            attackerName: attackerName,
+            victimTag: document.getElementById('input-victim-tag').value.trim(),
+            victimName: document.getElementById('input-victim-name').value.trim(),
+            victimCoords: document.getElementById('input-victim-coords').value.trim(),
+            losses: parseInt(document.getElementById('input-losses').value) || 0,
+            outcome: document.getElementById('input-outcome').value,
+            evidenceNote: document.getElementById('input-evidence-note').value.trim(),
+            timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19)
+          };
 
-        if (editingLogId) {
-          await fb.updateDoc(getFirestoreDoc('attackLogs', editingLogId), logPayload);
-          editingLogId = null;
-          uploadModal?.classList.add('hidden');
-        } else if (window.parsedLogBatch && window.parsedLogBatch.length > 0) {
-          await fb.addDoc(getFirestoreCol('attackLogs'), logPayload);
-          window.parsedLogBatch.splice(window.currentBatchIndex, 1);
+          if (editingLogId) {
+            await fb.updateDoc(getFirestoreDoc('attackLogs', editingLogId), logPayload);
+            editingLogId = null;
+            uploadModal?.classList.add('hidden');
+          } else if (window.parsedLogBatch && window.parsedLogBatch.length > 0) {
+            await fb.addDoc(getFirestoreCol('attackLogs'), logPayload);
+            window.parsedLogBatch.splice(window.currentBatchIndex, 1);
 
-          if (window.parsedLogBatch.length > 0) {
-            const nextIdx = Math.min(window.currentBatchIndex, window.parsedLogBatch.length - 1);
-            window.populateFormFromBatchIndex(nextIdx);
+            if (window.parsedLogBatch.length > 0) {
+              const nextIdx = Math.min(window.currentBatchIndex, window.parsedLogBatch.length - 1);
+              window.populateFormFromBatchIndex(nextIdx);
+            } else {
+              attackForm.reset();
+              document.getElementById('batch-control-container')?.classList.add('hidden');
+              document.getElementById('ocr-badge-count')?.classList.add('hidden');
+              uploadModal?.classList.add('hidden');
+            }
           } else {
-            document.getElementById('attack-form').reset();
-            document.getElementById('batch-control-container')?.classList.add('hidden');
-            document.getElementById('ocr-badge-count')?.classList.add('hidden');
+            await fb.addDoc(getFirestoreCol('attackLogs'), logPayload);
             uploadModal?.classList.add('hidden');
           }
-        } else {
-          await fb.addDoc(getFirestoreCol('attackLogs'), logPayload);
-          uploadModal?.classList.add('hidden');
-        }
-      });
+        });
+      }
 
       // Publish All Logs Batch Write
       document.getElementById('btn-publish-all-logs')?.addEventListener('click', async () => {
@@ -1312,7 +1325,7 @@
 
     window.renderStatsBanner = function() {
       const totalAttacks = attackLogs.length;
-      const totalCasualties = attackLogs.reduce((sum, l) => sum + (l.losses || 0), document.getElementById('stat-total-attacks').innerText = totalAttacks, 0);
+      const totalCasualties = attackLogs.reduce((sum, l) => sum + (l.losses || 0), 0);
       
       const aggCounts = {};
       const vicCounts = {};
