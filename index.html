@@ -875,6 +875,28 @@
       }
     }
 
+    // Text Normalization Pre-Processor for Raw Pasted Text Input
+    function normalizePastedRawText(text) {
+      if (!text || typeof text !== 'string') return '';
+      return text
+        .split('\n')
+        .map(line => {
+          let l = line.trim();
+          if (!l) return '';
+          // Remove leading pipes, orphan quotes, bullets, or dashes
+          l = l.replace(/^[|"'’`•\-–—\s]+/, '');
+          // Remove orphan quotes or pipes after key verbs
+          l = l.replace(/(fell to|defeated|attacked)\s*["'’`|]+/gi, '$1 ');
+          // Clean alliance tag brackets with quotes or pipes (e.g., [VOR]" or | [VOR])
+          l = l.replace(/\|?\s*\[\s*([A-Za-z0-9]{2,5})\s*\]["'’`|]*/g, '[$1]');
+          // Remove trailing single-letter artifact noise and trailing quotes/pipes
+          l = l.replace(/\s+[a-z]$/i, '');
+          l = l.replace(/\s*[|"'’`]+$/, '');
+          return l;
+        })
+        .join('\n');
+    }
+
     // Split-by-Timestamp Chunking & Flexible Quote Parser
     function parseRawTextToLogs(rawText) {
       if (!rawText || typeof rawText !== 'string') return [];
@@ -1244,7 +1266,8 @@
         const pasteVal = document.getElementById('input-raw-paste-text')?.value || '';
         if (!pasteVal.trim()) return;
 
-        const parsedArray = parseRawTextToLogs(pasteVal);
+        const normalizedText = normalizePastedRawText(pasteVal);
+        const parsedArray = parseRawTextToLogs(normalizedText);
         if (parsedArray && parsedArray.length > 0) {
           window.parsedLogBatch = parsedArray;
           window.currentBatchIndex = 0;
