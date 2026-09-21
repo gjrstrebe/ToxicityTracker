@@ -379,19 +379,45 @@
 
         <!-- OCR Upload Zone -->
         <div id="view-ocr" class="space-y-3">
-          <div id="drop-zone" class="border-2 border-dashed border-frost-700 hover:border-frost-accent rounded-xl p-5 text-center cursor-pointer transition-colors bg-frost-900/30 flex flex-col items-center justify-center gap-2">
-            <i data-lucide="image-plus" class="w-8 h-8 text-slate-400"></i>
-            <div class="text-sm text-slate-200">
-              <span class="font-semibold text-frost-accent">Tap to upload</span> or drag screenshot here
-            </div>
-            <p class="text-xs text-slate-500">Supports PNG, JPG (Gemini Vision multi-log scan)</p>
-            <input type="file" id="file-input" accept="image/*" class="hidden">
+          <!-- Input Mode Tabs -->
+          <div class="flex items-center gap-2 border-b border-frost-700/60 pb-2 mb-3">
+            <button type="button" id="tab-mode-ocr" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-frost-accent text-frost-900 flex items-center gap-1.5 cursor-pointer transition-all">
+              <i data-lucide="image" class="w-3.5 h-3.5"></i>
+              <span>Upload Screenshot</span>
+            </button>
+            <button type="button" id="tab-mode-paste" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:bg-frost-700/50 flex items-center gap-1.5 cursor-pointer transition-all">
+              <i data-lucide="clipboard-type" class="w-3.5 h-3.5"></i>
+              <span>Paste Raw Text</span>
+            </button>
           </div>
 
-          <!-- Processing State Spinner -->
-          <div id="ocr-loading" class="hidden p-4 bg-frost-900/50 rounded-lg border border-frost-700 text-center space-y-2">
-            <div class="inline-block animate-spin rounded-full h-6 w-6 border-2 border-frost-accent border-t-transparent"></div>
-            <p class="text-xs text-slate-300 font-medium">Extracting multi-log battle reports via Gemini Vision AI...</p>
+          <!-- Mode 1: Screenshot Drop Zone -->
+          <div id="panel-mode-ocr" class="space-y-3">
+            <div id="drop-zone" class="border-2 border-dashed border-frost-700 hover:border-frost-accent rounded-xl p-5 text-center cursor-pointer transition-colors bg-frost-900/30 flex flex-col items-center justify-center gap-2">
+              <i data-lucide="image-plus" class="w-8 h-8 text-slate-400"></i>
+              <div class="text-sm text-slate-200">
+                <span class="font-semibold text-frost-accent">Tap to upload</span> or drag screenshot here
+              </div>
+              <p class="text-xs text-slate-500">Supports PNG, JPG (Gemini Vision multi-log scan)</p>
+              <input type="file" id="file-input" accept="image/*" class="hidden">
+            </div>
+
+            <!-- Processing State Spinner -->
+            <div id="ocr-loading" class="hidden p-4 bg-frost-900/50 rounded-lg border border-frost-700 text-center space-y-2">
+              <div class="inline-block animate-spin rounded-full h-6 w-6 border-2 border-frost-accent border-t-transparent"></div>
+              <p class="text-xs text-slate-300 font-medium">Extracting multi-log battle reports via Gemini Vision AI...</p>
+            </div>
+          </div>
+
+          <!-- Mode 2: Paste Raw Text Input -->
+          <div id="panel-mode-paste" class="hidden space-y-3">
+            <textarea id="input-raw-paste-text" rows="5" placeholder="Paste attack log broadcast text here (e.g. from Discord, OCR output, or game logs containing 'UTC ... s mighty attack!')..." class="w-full bg-frost-900 border border-frost-700 rounded-lg p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-frost-accent resize-y"></textarea>
+            <div class="flex justify-end">
+              <button type="button" id="btn-parse-pasted-text" class="px-4 py-2 bg-frost-accent hover:bg-sky-400 text-frost-900 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                <span>Parse Text Batch</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1178,6 +1204,9 @@
         window.parsedLogBatch = [];
         window.currentBatchIndex = 0;
         document.getElementById('attack-form').reset();
+        const rawPasteArea = document.getElementById('input-raw-paste-text');
+        if (rawPasteArea) rawPasteArea.value = '';
+
         document.getElementById('batch-control-container')?.classList.add('hidden');
         document.getElementById('ocr-badge-count')?.classList.add('hidden');
         document.getElementById('modal-form-title').innerHTML = `<i data-lucide="upload-cloud" class="w-5 h-5 text-frost-accent"></i> Submit Battle Report`;
@@ -1188,6 +1217,54 @@
       });
 
       document.getElementById('btn-close-modal')?.addEventListener('click', () => uploadModal?.classList.add('hidden'));
+
+      // Input Mode Tab Switching inside Upload Modal
+      const tabModeOcr = document.getElementById('tab-mode-ocr');
+      const tabModePaste = document.getElementById('tab-mode-paste');
+      const panelModeOcr = document.getElementById('panel-mode-ocr');
+      const panelModePaste = document.getElementById('panel-mode-paste');
+
+      if (tabModeOcr && tabModePaste) {
+        tabModeOcr.addEventListener('click', () => {
+          tabModeOcr.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-frost-accent text-frost-900 flex items-center gap-1.5 cursor-pointer transition-all";
+          tabModePaste.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:bg-frost-700/50 flex items-center gap-1.5 cursor-pointer transition-all";
+          panelModeOcr?.classList.remove('hidden');
+          panelModePaste?.classList.add('hidden');
+        });
+        tabModePaste.addEventListener('click', () => {
+          tabModePaste.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-frost-accent text-frost-900 flex items-center gap-1.5 cursor-pointer transition-all";
+          tabModeOcr.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white hover:bg-frost-700/50 flex items-center gap-1.5 cursor-pointer transition-all";
+          panelModePaste?.classList.remove('hidden');
+          panelModeOcr?.classList.add('hidden');
+        });
+      }
+
+      // Parse Pasted Raw Text Handler
+      document.getElementById('btn-parse-pasted-text')?.addEventListener('click', () => {
+        const pasteVal = document.getElementById('input-raw-paste-text')?.value || '';
+        if (!pasteVal.trim()) return;
+
+        const parsedArray = parseRawTextToLogs(pasteVal);
+        if (parsedArray && parsedArray.length > 0) {
+          window.parsedLogBatch = parsedArray;
+          window.currentBatchIndex = 0;
+          window.populateFormFromBatchIndex(0);
+
+          document.getElementById('batch-control-container')?.classList.remove('hidden');
+          const ocrBadge = document.getElementById('ocr-badge-count');
+          if (ocrBadge) {
+            ocrBadge.classList.remove('hidden');
+            ocrBadge.innerText = `Parsed ${window.parsedLogBatch.length} Logs`;
+          }
+        } else {
+          const debugModal = document.getElementById('debug-ocr-modal');
+          const debugContent = document.getElementById('debug-ocr-content');
+          if (debugModal && debugContent) {
+            debugContent.value = "Pasted Text Analysis (Zero Parsed Logs):\n\n" + pasteVal;
+            debugModal.classList.remove('hidden');
+          }
+        }
+      });
 
       // File Upload & FileReader Pipeline
       const dropZone = document.getElementById('drop-zone');
