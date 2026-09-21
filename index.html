@@ -888,7 +888,7 @@
           // Remove leading pipes, hashes, orphan quotes, bullets, or dashes
           l = l.replace(/^[|#"''’`•\-–—\s]+/, '');
           // Remove orphan quotes, pipes, or hashes after key verbs
-          l = l.replace(/(fell to|defeated|attacked)\s*[|#"''’`\s]+/gi, '$1 ');
+          l = l.replace(/(fell to|fought off|defeated|attacked)\s*[|#"''’`\s]+/gi, '$1 ');
           // Clean alliance tag brackets with quotes, pipes, or hashes (e.g. | # [VOR] " -> [VOR])
           l = l.replace(/[|#"'’`\s]*\[\s*([A-Za-z0-9]{2,5})\s*\][|#"''’`\s]*/g, '[$1] ');
           // Remove artifact symbols (#, |, orphan quotes) before/after brackets
@@ -900,110 +900,181 @@
         .join('\n');
     }
 
-    // Split-by-Timestamp Chunking & Flexible Quote Parser
+    // Flexible Log Parser for Raw Pasted Text and Variable Formats
     function parseRawTextToLogs(rawText) {
       if (!rawText || typeof rawText !== 'string') return [];
       const logs = [];
-      const entries = rawText.split(/UTC\s+/i).filter(Boolean);
 
-      for (const entry of entries) {
-        const lines = entry.split('\n').map(l => l.trim()).filter(Boolean);
-        if (lines.length === 0) continue;
+      // Normalize input line breaks and stray symbols
+      const normalized = normalizePastedRawText(rawText);
+      const lines = normalized.split('\n').map(l => l.trim()).filter(Boolean);
 
-        let timestamp = lines[0] || "";
-        const tsMatch = lines[0].match(/(\d{4}[-/.]\d{2}[-/.]\d{2}\s+\d{2}:\d{2}:\d{2})/);
-        if (tsMatch) timestamp = tsMatch[1];
+      let pendingTimestamp = "";
 
-        let attackerRaw = "";
-        let victimRaw = "";
-        let coords = "";
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
 
-        for (const line of lines) {
-          const lower = line.toLowerCase();
-          if (lower.includes("mighty attack!") || lower.includes("mighty attack")) {
-            attackerRaw = line;
-          } else if (lower.includes("x:") || lower.includes("y:") || lower.includes("city")) {
-            victimRaw = line;
-          } else if (!victimRaw && /(?:X[:\s]*\d+[\s,]+Y[:\s]*\d+)/i.test(line)) {
-            victimRaw = line;
+        // Check for standalone or inline UTC timestamp (e.g., "UTC 2026-09-17 17:34:08" or "2026-09-17 17:34:08")
+        const tsMatch = line.match(/(?:UTC\s+)?(\d{4}[-/.]\d{2}[-/.]\d{2}\s+\d{2}:\d{2}:\d{2})/i);
+        if (tsMatch) {
+          pendingTimestamp = tsMatch[1];
+          // If the previously parsed log entry is waiting for a timestamp that follows it, assign it
+          if (logs.length > 0 && (!logs[logs.length - 1].timestamp || logs[logs.length - 1].timestamp.includes('T'))) {
+            logs[logs.length - 1].timestamp = pendingTimestamp;
           }
+          continue;
         }
 
-        // Fallback: inspect remaining lines if victim was not isolated by keywords
-        if (!victimRaw) {
-          for (const line of lines) {
-            if (line !== timestamp && line !== attackerRaw && line.length > 3) {
-              victimRaw = line;
-              break;
+        // Match flexible battle event line:
+        // Victim (X:num, Y:num) [fell to | fought off] [Optional Tag] Attacker ['s mighty attack! | 's attack!]
+        const eventRegex = /(.*?)\s*\(?\s*X[:\s]*(\d+)[\s,]+Y[:\s]*(\d+)\)?\s*(fell to|fought off)\s*(.*?)(?:[‘'’"`]?s\s*(?:mighty\s+)?attack!?)?$/i;
+        const eventMatch = line.match(eventRegex);
+
+        if (eventMatch) {
+          let rawVictim = eventMatch[1].trim();
+          const coordX = eventMatch[2];
+          const coordY = eventMatch[3];
+          const verb = eventMatch[4].toLowerCase();
+          let rawAttacker = eventMatch[5].trim();
+
+          // Strip trailing 's mighty attack! / 's attack! if captured in rawAttacker
+          rawAttacker = rawAttacker.replace(/(?:[‘'’"`]?s)?\s*(?:mighty\s+)?attack!?$/i, "").trim();
+
+          // Clean Victim String: strip trailing 's City or City
+          rawVictim = rawVictim.replace(/['‘’"`]?s\s+City$/i, "").replace(/\s+City$/i, "").trim();
+          rawVictim = rawVictim.replace(/[|#"''’`]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+          // Extract Victim Tag (optional) and Name
+          let victimTag = "ASS";
+          let victimName = rawVictim;
+          const vTagMatch = rawVictim.match(/\[([A-Za-z0-9]{2,5})\]/);
+          if (vTagMatch) {
+            victimTag = vTagMatch[1].toUpperCase();
+            victimName = rawVictim.replace(/\[.*?\]/g, '').trim();
+          }
+
+          // Clean Attacker String: strip flourishes and stray characters
+          rawAttacker = rawAttacker.replace(/[|#"''’`]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+          // Extract Attacker Tag (optional) and Name
+          let attackerTag = "";
+          let attackerName = rawAttacker;
+          const aTagMatch = rawAttacker.match(/\[([A-Za-z0-9]{2,5})\]/);
+          if (aTagMatch) {
+            attackerTag = aTagMatch[1].toUpperCase();
+            attackerName = rawAttacker.replace(/\[.*?\]/g, '').trim();
+          }
+
+          // Outcome mapping
+          const outcome = verb === "fought off" ? "Victory" : "Defeat";
+          const coords = `X:${coordX}, Y:${coordY}`;
+
+          // Check if timestamp is on the next line or already parsed
+          let logTimestamp = pendingTimestamp;
+          if (i + 1 < lines.length) {
+            const nextTs = lines[i + 1].match(/(?:UTC\s+)?(\d{4}[-/.]\d{2}[-/.]\d{2}\s+\d{2}:\d{2}:\d{2})/i);
+            if (nextTs) {
+              logTimestamp = nextTs[1];
+              pendingTimestamp = logTimestamp;
+              i++; // Advance line pointer since timestamp line was consumed
             }
           }
-        }
 
-        // Extract Attacker (everything before 's mighty attack!, allowing curly or straight apostrophes)
-        let attackerFull = "";
-        if (attackerRaw) {
-          const attackerMatch = attackerRaw.match(/^(.+?)(?:[‘'’"`]?\s*s)?\s*mighty\s+attack!?/i);
-          if (attackerMatch) {
-            attackerFull = attackerMatch[1].trim();
-          } else {
-            attackerFull = attackerRaw.replace(/(?:['‘’"`]?s)?\s*mighty\s+attack!?/i, "").trim();
-          }
-        }
-
-        // Clean attacker string from stray #, |, quotes, hashes
-        attackerFull = attackerFull.replace(/[|#"''’`]+/g, ' ').replace(/\s+/g, ' ').trim();
-
-        let attackerTag = "VOR";
-        let attackerName = attackerFull;
-        const aTagMatch = attackerFull.match(/\[([A-Za-z0-9]{2,5})\]/);
-        if (aTagMatch) {
-          attackerTag = aTagMatch[1].toUpperCase();
-          attackerName = attackerFull.replace(/\[.*?\]/g, '').replace(/[|#"''’`]+/g, ' ').replace(/\s+/g, ' ').trim();
-        }
-
-        // Extract Victim and Coords (flexible matching for (X:..., Y:...) or X:..., Y:...)
-        let victimFull = "";
-        if (victimRaw) {
-          const coordMatch = victimRaw.match(/(.*?)\s*\(?\s*X[:\s]*(\d+)[\s,]+Y[:\s]*(\d+)\)?/i);
-          if (coordMatch) {
-            let rawVic = coordMatch[1].trim();
-            victimFull = rawVic.replace(/['‘’]s\s+City$/i, "").replace(/\s+City$/i, "").trim();
-            coords = `X:${coordMatch[2]}, Y:${coordMatch[3]}`;
-          } else {
-            victimFull = victimRaw.replace(/['‘’]s\s+City$/i, "").replace(/\s+City$/i, "").trim();
-          }
-        }
-
-        // Clean victim string from stray #, |, quotes, hashes
-        victimFull = victimFull.replace(/[|#"''’`]+/g, ' ').replace(/\s+/g, ' ').trim();
-
-        let victimTag = "ASS";
-        let victimName = victimFull;
-        const vTagMatch = victimFull.match(/\[([A-Za-z0-9]{2,5})\]/);
-        if (vTagMatch) {
-          victimTag = vTagMatch[1].toUpperCase();
-          victimName = victimFull.replace(/\[.*?\]/g, '').replace(/[|#"''’`]+/g, ' ').replace(/\s+/g, ' ').trim();
-        }
-
-        if (attackerName || victimName || coords) {
           logs.push({
             state: 4336,
             attackerId: "",
-            attackerTag: attackerTag || "VOR",
-            attackerName: attackerName || "",
-            attacker: attackerFull || attackerName || "",
+            attackerTag: attackerTag || "",
+            attackerName: attackerName || rawAttacker || "Unknown",
+            attacker: rawAttacker || attackerName,
             victimId: "",
             victimTag: victimTag || "ASS",
-            victimName: victimName || "",
-            victim: victimFull || victimName || "",
-            victimCoords: coords || "X:393, Y:802",
-            coords: coords || "X:393, Y:802",
+            victimName: victimName || rawVictim || "Unknown",
+            victim: rawVictim || victimName,
+            victimCoords: coords,
+            coords: coords,
             losses: 0,
-            outcome: "Defeat",
-            timestamp: timestamp.trim() || new Date().toISOString().replace('T', ' ').substring(0, 19),
+            outcome: outcome,
+            timestamp: logTimestamp || new Date().toISOString().replace('T', ' ').substring(0, 19),
             evidenceNote: "",
             note: ""
           });
+        }
+      }
+
+      // Fallback: If line-based parsing didn't match any events, split by UTC chunks
+      if (logs.length === 0) {
+        const entries = rawText.split(/UTC\s+/i).filter(Boolean);
+        for (const entry of entries) {
+          const entryLines = entry.split('\n').map(l => l.trim()).filter(Boolean);
+          if (entryLines.length === 0) continue;
+
+          let ts = "";
+          const tsM = entryLines[0].match(/(\d{4}[-/.]\d{2}[-/.]\d{2}\s+\d{2}:\d{2}:\d{2})/);
+          if (tsM) ts = tsM[1];
+
+          let attackerRaw = "";
+          let victimRaw = "";
+
+          for (const el of entryLines) {
+            const lower = el.toLowerCase();
+            if (lower.includes("mighty attack") || lower.includes("attack!") || lower.includes("fell to") || lower.includes("fought off")) {
+              attackerRaw = el;
+            } else if (lower.includes("x:") || lower.includes("y:")) {
+              victimRaw = el;
+            }
+          }
+
+          if (attackerRaw || victimRaw) {
+            let attackerFull = attackerRaw.replace(/(?:['‘’"`]?s)?\s*(?:mighty\s+)?attack!?/i, "").trim();
+            attackerFull = attackerFull.replace(/.*?(?:fell to|fought off)\s*/i, "").trim();
+            attackerFull = attackerFull.replace(/[|#"''’`]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+            let aTag = "";
+            let aName = attackerFull;
+            const aTM = attackerFull.match(/\[([A-Za-z0-9]{2,5})\]/);
+            if (aTM) {
+              aTag = aTM[1].toUpperCase();
+              aName = attackerFull.replace(/\[.*?\]/g, '').trim();
+            }
+
+            let victimFull = victimRaw.replace(/['‘’"`]?s\s+City$/i, "").replace(/\s+City$/i, "").trim();
+            let coords = "X:393, Y:802";
+            const cM = victimRaw.match(/\(?\s*X[:\s]*(\d+)[\s,]+Y[:\s]*(\d+)\)?/i);
+            if (cM) {
+              coords = `X:${cM[1]}, Y:${cM[2]}`;
+              victimFull = victimRaw.replace(cM[0], "").replace(/['‘’"`]?s\s+City$/i, "").trim();
+            }
+            victimFull = victimFull.replace(/[|#"''’`]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+            let vTag = "ASS";
+            let vName = victimFull;
+            const vTM = victimFull.match(/\[([A-Za-z0-9]{2,5})\]/);
+            if (vTM) {
+              vTag = vTM[1].toUpperCase();
+              vName = victimFull.replace(/\[.*?\]/g, '').trim();
+            }
+
+            const outcome = attackerRaw.toLowerCase().includes("fought off") ? "Victory" : "Defeat";
+
+            logs.push({
+              state: 4336,
+              attackerId: "",
+              attackerTag: aTag || "",
+              attackerName: aName || "Unknown",
+              attacker: attackerFull || aName,
+              victimId: "",
+              victimTag: vTag || "ASS",
+              victimName: vName || "Unknown",
+              victim: victimFull || vName,
+              victimCoords: coords,
+              coords: coords,
+              losses: 0,
+              outcome: outcome,
+              timestamp: ts || new Date().toISOString().replace('T', ' ').substring(0, 19),
+              evidenceNote: "",
+              note: ""
+            });
+          }
         }
       }
 
