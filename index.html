@@ -878,20 +878,23 @@
     // Text Normalization Pre-Processor for Raw Pasted Text Input
     function normalizePastedRawText(text) {
       if (!text || typeof text !== 'string') return '';
-      return text
+      // Pre-clean broken multi-line artifacts like '\n -'s' or '\n - '
+      let preCleaned = text.replace(/\n\s*-\s*(?=['’'s])/g, '');
+      return preCleaned
         .split('\n')
         .map(line => {
           let l = line.trim();
           if (!l) return '';
-          // Remove leading pipes, orphan quotes, bullets, or dashes
-          l = l.replace(/^[|"'’`•\-–—\s]+/, '');
-          // Remove orphan quotes or pipes after key verbs
-          l = l.replace(/(fell to|defeated|attacked)\s*["'’`|]+/gi, '$1 ');
-          // Clean alliance tag brackets with quotes or pipes (e.g., [VOR]" or | [VOR])
-          l = l.replace(/\|?\s*\[\s*([A-Za-z0-9]{2,5})\s*\]["'’`|]*/g, '[$1]');
-          // Remove trailing single-letter artifact noise and trailing quotes/pipes
-          l = l.replace(/\s+[a-z]$/i, '');
-          l = l.replace(/\s*[|"'’`]+$/, '');
+          // Remove leading pipes, hashes, orphan quotes, bullets, or dashes
+          l = l.replace(/^[|#"''’`•\-–—\s]+/, '');
+          // Remove orphan quotes, pipes, or hashes after key verbs
+          l = l.replace(/(fell to|defeated|attacked)\s*[|#"''’`\s]+/gi, '$1 ');
+          // Clean alliance tag brackets with quotes, pipes, or hashes (e.g. | # [VOR] " -> [VOR])
+          l = l.replace(/[|#"'’`\s]*\[\s*([A-Za-z0-9]{2,5})\s*\][|#"''’`\s]*/g, '[$1] ');
+          // Remove artifact symbols (#, |, orphan quotes) before/after brackets
+          l = l.replace(/[|#"''’`]+/g, ' ');
+          // Collapse multiple spaces
+          l = l.replace(/\s+/g, ' ').trim();
           return l;
         })
         .join('\n');
@@ -916,52 +919,73 @@
         let coords = "";
 
         for (const line of lines) {
-          if (line.toLowerCase().includes("mighty attack!")) {
+          const lower = line.toLowerCase();
+          if (lower.includes("mighty attack!") || lower.includes("mighty attack")) {
             attackerRaw = line;
-          } else if (line.includes("(X:") && line.includes("Y:")) {
+          } else if (lower.includes("x:") || lower.includes("y:") || lower.includes("city")) {
             victimRaw = line;
           } else if (!victimRaw && /(?:X[:\s]*\d+[\s,]+Y[:\s]*\d+)/i.test(line)) {
             victimRaw = line;
           }
         }
 
+        // Fallback: inspect remaining lines if victim was not isolated by keywords
+        if (!victimRaw) {
+          for (const line of lines) {
+            if (line !== timestamp && line !== attackerRaw && line.length > 3) {
+              victimRaw = line;
+              break;
+            }
+          }
+        }
+
         // Extract Attacker (everything before 's mighty attack!, allowing curly or straight apostrophes)
         let attackerFull = "";
-        const attackerMatch = attackerRaw.match(/^(.+?)[‘'’]s\s+mighty\s+attack!/i);
-        if (attackerMatch) {
-          attackerFull = attackerMatch[1].trim();
-        } else {
-          attackerFull = attackerRaw.replace(/['‘’]s\s+mighty\s+attack!/i, "").trim();
+        if (attackerRaw) {
+          const attackerMatch = attackerRaw.match(/^(.+?)(?:[‘'’"`]?\s*s)?\s*mighty\s+attack!?/i);
+          if (attackerMatch) {
+            attackerFull = attackerMatch[1].trim();
+          } else {
+            attackerFull = attackerRaw.replace(/(?:['‘’"`]?s)?\s*mighty\s+attack!?/i, "").trim();
+          }
         }
+
+        // Clean attacker string from stray #, |, quotes, hashes
+        attackerFull = attackerFull.replace(/[|#"''’`]+/g, ' ').replace(/\s+/g, ' ').trim();
 
         let attackerTag = "VOR";
         let attackerName = attackerFull;
         const aTagMatch = attackerFull.match(/\[([A-Za-z0-9]{2,5})\]/);
         if (aTagMatch) {
           attackerTag = aTagMatch[1].toUpperCase();
-          attackerName = attackerFull.replace(/\[.*?\]/g, '').trim();
+          attackerName = attackerFull.replace(/\[.*?\]/g, '').replace(/[|#"''’`]+/g, ' ').replace(/\s+/g, ' ').trim();
         }
 
-        // Extract Victim and Coords
+        // Extract Victim and Coords (flexible matching for (X:..., Y:...) or X:..., Y:...)
         let victimFull = "";
-        const coordMatch = victimRaw.match(/(.*?)\s*\(X:(\d+),\s*Y:(\d+)\)/);
-        if (coordMatch) {
-          let rawVic = coordMatch[1].trim();
-          victimFull = rawVic.replace(/['‘’]s\s+City$/i, "").replace(/\s+City$/i, "").trim();
-          coords = `X:${coordMatch[2]}, Y:${coordMatch[3]}`;
-        } else if (victimRaw) {
-          victimFull = victimRaw.replace(/['‘’]s\s+City$/i, "").replace(/\s+City$/i, "").trim();
+        if (victimRaw) {
+          const coordMatch = victimRaw.match(/(.*?)\s*\(?\s*X[:\s]*(\d+)[\s,]+Y[:\s]*(\d+)\)?/i);
+          if (coordMatch) {
+            let rawVic = coordMatch[1].trim();
+            victimFull = rawVic.replace(/['‘’]s\s+City$/i, "").replace(/\s+City$/i, "").trim();
+            coords = `X:${coordMatch[2]}, Y:${coordMatch[3]}`;
+          } else {
+            victimFull = victimRaw.replace(/['‘’]s\s+City$/i, "").replace(/\s+City$/i, "").trim();
+          }
         }
+
+        // Clean victim string from stray #, |, quotes, hashes
+        victimFull = victimFull.replace(/[|#"''’`]+/g, ' ').replace(/\s+/g, ' ').trim();
 
         let victimTag = "ASS";
         let victimName = victimFull;
         const vTagMatch = victimFull.match(/\[([A-Za-z0-9]{2,5})\]/);
         if (vTagMatch) {
           victimTag = vTagMatch[1].toUpperCase();
-          victimName = victimFull.replace(/\[.*?\]/g, '').trim();
+          victimName = victimFull.replace(/\[.*?\]/g, '').replace(/[|#"''’`]+/g, ' ').replace(/\s+/g, ' ').trim();
         }
 
-        if (attackerFull || victimFull || coords) {
+        if (attackerName || victimName || coords) {
           logs.push({
             state: 4336,
             attackerId: "",
