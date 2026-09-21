@@ -197,6 +197,11 @@
           <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
           <span>Intel & Analytics</span>
         </button>
+        <button id="view-tab-admin" class="px-4 py-2 text-xs font-bold rounded-lg text-slate-400 hover:text-white hover:bg-frost-800 flex items-center gap-2 cursor-pointer transition-all">
+          <i data-lucide="table" class="w-4 h-4 text-amber-400"></i>
+          <span>Admin Data Grid</span>
+          <span id="admin-anomaly-badge" class="hidden bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded-full text-[10px] font-mono">0 Anomalies</span>
+        </button>
       </div>
       <span class="text-xs text-slate-400 hidden sm:inline-block">State Filter: <strong class="text-frost-accent">State #4336</strong></span>
     </div>
@@ -349,6 +354,49 @@
           <span class="text-xs font-bold text-sky-300 bg-sky-500/10 px-2.5 py-1 rounded-full border border-sky-500/20">[ASS] Alliance Focus</span>
         </div>
         <div id="analytics-defenders-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      </div>
+    </div>
+
+    <!-- SECTION: Admin Data Grid View -->
+    <div id="section-admin-view" class="hidden space-y-4">
+      <div class="bg-frost-800/40 border border-frost-700/50 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="font-bold text-white text-base flex items-center gap-2">
+            <i data-lucide="shield-check" class="w-5 h-5 text-amber-400"></i>
+            Admin Data Grid & Anomaly Repair Tool
+          </h3>
+          <p class="text-xs text-slate-400 mt-1">Spreadsheet-style inspection, player ID mapping, anomaly detection, and inline record cleaning.</p>
+        </div>
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+          <label class="flex items-center gap-2 text-xs text-slate-300 font-medium cursor-pointer select-none bg-frost-900/80 px-3 py-2 rounded-lg border border-frost-700">
+            <input type="checkbox" id="admin-filter-anomalies" class="rounded bg-frost-800 border-frost-700 text-amber-400 focus:ring-0 cursor-pointer">
+            <span>Show Anomalies Only</span>
+          </label>
+          <input type="text" id="admin-grid-search" placeholder="Search grid records..." class="bg-frost-900/80 border border-frost-700 text-xs text-slate-200 px-3 py-2 rounded-lg w-full sm:w-60 focus:outline-none focus:border-frost-accent">
+        </div>
+      </div>
+
+      <!-- Spreadsheet Data Table -->
+      <div class="bg-frost-800/40 border border-frost-700/50 rounded-xl overflow-hidden shadow-2xl">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-200 border-collapse">
+            <thead class="bg-frost-900/90 text-[11px] font-bold uppercase text-slate-400 border-b border-frost-700/80 sticky top-0 backdrop-blur z-10">
+              <tr>
+                <th class="p-3 min-w-[140px]">Timestamp</th>
+                <th class="p-3 min-w-[180px]">Attacker (Tag / IGN)</th>
+                <th class="p-3 min-w-[160px]">Attacker ID (Numeric)</th>
+                <th class="p-3 min-w-[220px]">Victim (Tag / IGN / Coords)</th>
+                <th class="p-3 min-w-[160px]">Outcome & Casualties</th>
+                <th class="p-3 min-w-[160px] text-center">Status & Actions</th>
+              </tr>
+            </thead>
+            <tbody id="admin-grid-tbody" class="divide-y divide-frost-700/40 font-mono text-[11px]">
+              <tr>
+                <td colspan="6" class="p-6 text-center text-slate-500 text-xs">Loading database records...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -878,22 +926,16 @@
     // Text Normalization Pre-Processor for Raw Pasted Text Input
     function normalizePastedRawText(text) {
       if (!text || typeof text !== 'string') return '';
-      // Pre-clean broken multi-line artifacts like '\n -'s' or '\n - '
       let preCleaned = text.replace(/\n\s*-\s*(?=['’'s])/g, '');
       return preCleaned
         .split('\n')
         .map(line => {
           let l = line.trim();
           if (!l) return '';
-          // Remove leading pipes, hashes, orphan quotes, bullets, or dashes
           l = l.replace(/^[|#"''’`•\-–—\s]+/, '');
-          // Remove orphan quotes, pipes, or hashes after key verbs
           l = l.replace(/(fell to|fought off|defeated|attacked)\s*[|#"''’`\s]+/gi, '$1 ');
-          // Clean alliance tag brackets with quotes, pipes, or hashes (e.g. | # [VOR] " -> [VOR])
           l = l.replace(/[|#"'’`\s]*\[\s*([A-Za-z0-9]{2,5})\s*\][|#"''’`\s]*/g, '[$1] ');
-          // Remove artifact symbols (#, |, orphan quotes) before/after brackets
           l = l.replace(/[|#"''’`]+/g, ' ');
-          // Collapse multiple spaces
           l = l.replace(/\s+/g, ' ').trim();
           return l;
         })
@@ -905,7 +947,6 @@
       if (!rawText || typeof rawText !== 'string') return [];
       const logs = [];
 
-      // Normalize input line breaks and stray symbols
       const normalized = normalizePastedRawText(rawText);
       const lines = normalized.split('\n').map(l => l.trim()).filter(Boolean);
 
@@ -914,19 +955,15 @@
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
 
-        // Check for standalone or inline UTC timestamp (e.g., "UTC 2026-09-17 17:34:08" or "2026-09-17 17:34:08")
         const tsMatch = line.match(/(?:UTC\s+)?(\d{4}[-/.]\d{2}[-/.]\d{2}\s+\d{2}:\d{2}:\d{2})/i);
         if (tsMatch) {
           pendingTimestamp = tsMatch[1];
-          // If the previously parsed log entry is waiting for a timestamp that follows it, assign it
           if (logs.length > 0 && (!logs[logs.length - 1].timestamp || logs[logs.length - 1].timestamp.includes('T'))) {
             logs[logs.length - 1].timestamp = pendingTimestamp;
           }
           continue;
         }
 
-        // Match flexible battle event line:
-        // Victim (X:num, Y:num) [fell to | fought off] [Optional Tag] Attacker ['s mighty attack! | 's attack!]
         const eventRegex = /(.*?)\s*\(?\s*X[:\s]*(\d+)[\s,]+Y[:\s]*(\d+)\)?\s*(fell to|fought off)\s*(.*?)(?:[‘'’"`]?s\s*(?:mighty\s+)?attack!?)?$/i;
         const eventMatch = line.match(eventRegex);
 
@@ -937,14 +974,11 @@
           const verb = eventMatch[4].toLowerCase();
           let rawAttacker = eventMatch[5].trim();
 
-          // Strip trailing 's mighty attack! / 's attack! if captured in rawAttacker
           rawAttacker = rawAttacker.replace(/(?:[‘'’"`]?s)?\s*(?:mighty\s+)?attack!?$/i, "").trim();
 
-          // Clean Victim String: strip trailing 's City or City
           rawVictim = rawVictim.replace(/['‘’"`]?s\s+City$/i, "").replace(/\s+City$/i, "").trim();
           rawVictim = rawVictim.replace(/[|#"''’`]+/g, ' ').replace(/\s+/g, ' ').trim();
 
-          // Extract Victim Tag (optional) and Name
           let victimTag = "ASS";
           let victimName = rawVictim;
           const vTagMatch = rawVictim.match(/\[([A-Za-z0-9]{2,5})\]/);
@@ -953,10 +987,8 @@
             victimName = rawVictim.replace(/\[.*?\]/g, '').trim();
           }
 
-          // Clean Attacker String: strip flourishes and stray characters
           rawAttacker = rawAttacker.replace(/[|#"''’`]+/g, ' ').replace(/\s+/g, ' ').trim();
 
-          // Extract Attacker Tag (optional) and Name
           let attackerTag = "";
           let attackerName = rawAttacker;
           const aTagMatch = rawAttacker.match(/\[([A-Za-z0-9]{2,5})\]/);
@@ -965,18 +997,16 @@
             attackerName = rawAttacker.replace(/\[.*?\]/g, '').trim();
           }
 
-          // Outcome mapping
           const outcome = verb === "fought off" ? "Victory" : "Defeat";
           const coords = `X:${coordX}, Y:${coordY}`;
 
-          // Check if timestamp is on the next line or already parsed
           let logTimestamp = pendingTimestamp;
           if (i + 1 < lines.length) {
             const nextTs = lines[i + 1].match(/(?:UTC\s+)?(\d{4}[-/.]\d{2}[-/.]\d{2}\s+\d{2}:\d{2}:\d{2})/i);
             if (nextTs) {
               logTimestamp = nextTs[1];
               pendingTimestamp = logTimestamp;
-              i++; // Advance line pointer since timestamp line was consumed
+              i++;
             }
           }
 
@@ -1001,7 +1031,6 @@
         }
       }
 
-      // Fallback: If line-based parsing didn't match any events, split by UTC chunks
       if (logs.length === 0) {
         const entries = rawText.split(/UTC\s+/i).filter(Boolean);
         for (const entry of entries) {
@@ -1171,7 +1200,6 @@
       window.currentBatchIndex = index;
       const log = window.parsedLogBatch[index];
 
-      // Auto-fill Player ID and Tag from known alias memory if ID is unassigned
       if (!log.attackerId && log.attackerName) {
         const match = findPlayerByAlias(log.attackerName);
         if (match) {
@@ -1225,6 +1253,79 @@
       cur.evidenceNote = document.getElementById('input-evidence-note').value;
     };
 
+    // Anomaly Detection Engine for Admin Data Grid
+    function detectLogAnomalies(l) {
+      const anomalies = [];
+      const aName = l.attackerName || '';
+      const vName = l.victimName || '';
+
+      if (!l.attackerId || !l.attackerId.trim()) {
+        anomalies.push('Missing Player ID');
+      }
+      if (/mighty attack|attack!|fell to|fought off/i.test(aName)) {
+        anomalies.push('Attacker Leak');
+      }
+      if (/mighty attack|fell to|fought off|\(X:/i.test(vName)) {
+        anomalies.push('Victim Leak');
+      }
+      if (vName.toLowerCase().includes('city')) {
+        anomalies.push('Victim "City" Noise');
+      }
+      if (!aName || aName === 'Unknown') {
+        anomalies.push('Missing Attacker Name');
+      }
+      if (!vName || vName === 'Unknown') {
+        anomalies.push('Missing Victim Name');
+      }
+
+      return anomalies;
+    }
+
+    window.saveAdminGridRow = async function(id) {
+      const fb = window.WOS_FIREBASE;
+      if (!fb) return;
+
+      const aId = document.getElementById(`admin-aid-${id}`)?.value.trim() || '';
+      const aTag = document.getElementById(`admin-atag-${id}`)?.value.trim() || '';
+      const aName = document.getElementById(`admin-aname-${id}`)?.value.trim() || '';
+      const vTag = document.getElementById(`admin-vtag-${id}`)?.value.trim() || 'ASS';
+      const vName = document.getElementById(`admin-vname-${id}`)?.value.trim() || '';
+      const vCoords = document.getElementById(`admin-vcoords-${id}`)?.value.trim() || '';
+      const ts = document.getElementById(`admin-ts-${id}`)?.value.trim() || '';
+      const losses = parseInt(document.getElementById(`admin-losses-${id}`)?.value) || 0;
+      const outcome = document.getElementById(`admin-outcome-${id}`)?.value || 'Defeat';
+
+      if (aId) {
+        getOrCreatePlayer(aId, aName, aTag);
+        await fb.setDoc(getFirestoreDoc('players', aId), players[aId], { merge: true });
+      }
+
+      const logPayload = {
+        attackerId: aId,
+        attackerTag: aTag,
+        attackerName: aName,
+        victimTag: vTag,
+        victimName: vName,
+        victimCoords: vCoords,
+        timestamp: ts,
+        losses: losses,
+        outcome: outcome
+      };
+
+      try {
+        await fb.updateDoc(getFirestoreDoc('attackLogs', id), logPayload);
+        const btn = document.getElementById(`btn-save-row-${id}`);
+        if (btn) {
+          const orig = btn.innerHTML;
+          btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i> Saved`;
+          setTimeout(() => { btn.innerHTML = orig; lucide.createIcons(); }, 1800);
+        }
+      } catch (e) {
+        console.error("Save admin row error:", e);
+      }
+    };
+
+    // DOM & Event Listeners Initialization
     document.addEventListener('DOMContentLoaded', () => {
       // Firebase Authentication & Snapshot Listeners
       const intervalCheck = setInterval(() => {
@@ -1262,39 +1363,52 @@
       const tabCombat = document.getElementById('view-tab-combat');
       const tabEvidence = document.getElementById('view-tab-evidence');
       const tabAnalytics = document.getElementById('view-tab-analytics');
+      const tabAdmin = document.getElementById('view-tab-admin');
 
       const secCombat = document.getElementById('section-combat-view');
       const secEvidence = document.getElementById('section-evidence-view');
       const secAnalytics = document.getElementById('section-analytics-view');
+      const secAdmin = document.getElementById('section-admin-view');
 
       function switchTab(target) {
+        if (target === 'admin' && !isAdminUnlocked) {
+          window.openPasscodeModal({ type: 'viewAdminTab' });
+          return;
+        }
+
         window.activeTab = target;
-        [tabCombat, tabEvidence, tabAnalytics].forEach(btn => {
+        [tabCombat, tabEvidence, tabAnalytics, tabAdmin].forEach(btn => {
           if (btn) btn.className = "px-4 py-2 text-xs font-bold rounded-lg text-slate-400 hover:text-white hover:bg-frost-800 flex items-center gap-2 cursor-pointer transition-all";
         });
 
+        [secCombat, secEvidence, secAnalytics, secAdmin].forEach(sec => sec?.classList.add('hidden'));
+
         if (target === 'combat') {
           if (tabCombat) tabCombat.className = "px-4 py-2 text-xs font-bold rounded-lg bg-frost-accent text-frost-900 flex items-center gap-2 cursor-pointer transition-all";
-          if (secCombat) secCombat.classList.remove('hidden');
-          if (secEvidence) secEvidence.classList.add('hidden');
-          if (secAnalytics) secAnalytics.classList.add('hidden');
+          secCombat?.classList.remove('hidden');
         } else if (target === 'evidence') {
           if (tabEvidence) tabEvidence.className = "px-4 py-2 text-xs font-bold rounded-lg bg-frost-accent text-frost-900 flex items-center gap-2 cursor-pointer transition-all";
-          if (secCombat) secCombat.classList.add('hidden');
-          if (secEvidence) secEvidence.classList.remove('hidden');
-          if (secAnalytics) secAnalytics.classList.add('hidden');
+          secEvidence?.classList.remove('hidden');
         } else if (target === 'analytics') {
           if (tabAnalytics) tabAnalytics.className = "px-4 py-2 text-xs font-bold rounded-lg bg-frost-accent text-frost-900 flex items-center gap-2 cursor-pointer transition-all";
-          if (secCombat) secCombat.classList.add('hidden');
-          if (secEvidence) secEvidence.classList.add('hidden');
-          if (secAnalytics) secAnalytics.classList.remove('hidden');
+          secAnalytics?.classList.remove('hidden');
+        } else if (target === 'admin') {
+          if (tabAdmin) tabAdmin.className = "px-4 py-2 text-xs font-bold rounded-lg bg-amber-500 text-frost-900 flex items-center gap-2 cursor-pointer transition-all";
+          secAdmin?.classList.remove('hidden');
         }
         window.renderApp();
       }
 
+      window.switchTab = switchTab;
+
       if (tabCombat) tabCombat.addEventListener('click', () => switchTab('combat'));
       if (tabEvidence) tabEvidence.addEventListener('click', () => switchTab('evidence'));
       if (tabAnalytics) tabAnalytics.addEventListener('click', () => switchTab('analytics'));
+      if (tabAdmin) tabAdmin.addEventListener('click', () => switchTab('admin'));
+
+      // Admin Data Grid Filters
+      document.getElementById('admin-grid-search')?.addEventListener('input', () => window.renderAdminGrid());
+      document.getElementById('admin-filter-anomalies')?.addEventListener('change', () => window.renderAdminGrid());
 
       // Analytics Timeframe Pills
       const tf24 = document.getElementById('timeframe-24h');
@@ -1554,6 +1668,7 @@
             if (pendingAdminAction.type === 'edit') executeEditLog(pendingAdminAction.id);
             else if (pendingAdminAction.type === 'delete') executeDeleteLog(pendingAdminAction.id);
             else if (pendingAdminAction.type === 'reset') executeResetCloudData();
+            else if (pendingAdminAction.type === 'viewAdminTab') window.switchTab('admin');
             pendingAdminAction = null;
           }
         } else {
@@ -1580,13 +1695,14 @@
       });
     });
 
-    // Master UI Render Engine (Combat Feed, Leaderboards, Analytics)
+    // Master UI Render Engine
     window.renderApp = function() {
       window.renderTicker();
       window.renderStatsBanner();
       window.renderFeed();
       window.renderEvidenceFeed();
       window.renderAnalytics();
+      window.renderAdminGrid();
       lucide.createIcons();
     };
 
@@ -1616,7 +1732,6 @@
       const now = new Date().getTime();
       const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
 
-      // Filter logs within 24h window
       let recentLogs = attackLogs.filter(l => {
         const logDate = parseLogDate(l.timestamp);
         if (!logDate) return false;
@@ -1624,7 +1739,6 @@
         return diff <= TWENTY_FOUR_HOURS && diff >= 0;
       });
 
-      // Fallback: If no logs in past 24h, use the 5 most recent logs overall
       if (recentLogs.length === 0) {
         recentLogs = [...attackLogs].sort((a, b) => {
           const dA = parseLogDate(a.timestamp);
@@ -1638,7 +1752,6 @@
         return;
       }
 
-      // Generate marquee items for recent logs
       let items = recentLogs.map(l => {
         const aTag = l.attackerTag ? `[${l.attackerTag}] ` : '';
         const aName = l.attackerName || l.attacker || 'Unknown';
@@ -1650,7 +1763,6 @@
         return `<span class="inline-flex items-center gap-1.5"><strong class="text-red-400">🚨 ALERT:</strong> <span class="text-slate-200">${aTag}${aName}</span> <span class="text-red-400 font-bold">attacked</span> <span class="text-sky-300">${vTag}${vName}</span>${coords}${losses}<span class="text-slate-400">${time}</span></span>`;
       });
 
-      // Repeat items array if short to ensure smooth scrolling ticker continuity
       let tickerItems = [...items];
       if (tickerItems.length < 4) {
         tickerItems = [...tickerItems, ...tickerItems, ...tickerItems];
@@ -1781,7 +1893,6 @@
       document.getElementById('analytics-top-alliance').innerText = topAlliance !== 'N/A' ? `[${topAlliance}]` : 'N/A';
       document.getElementById('analytics-top-target').innerText = topTarget !== 'N/A' ? `[${topTarget}]` : 'N/A';
 
-      // Aggressors Leaderboard
       const aggList = document.getElementById('analytics-aggressors-list');
       const sortedAgg = Object.entries(playerCasualties).sort((a,b) => b[1] - a[1]).slice(0, 5);
       if (aggList) {
@@ -1796,7 +1907,6 @@
         `).join('') : `<div class="text-xs text-slate-500 text-center py-4">No rival player data logged.</div>`;
       }
 
-      // Alliance Breakdown List
       const allianceList = document.getElementById('analytics-alliances-list');
       const sortedAlliances = Object.entries(aggCounts).sort((a,b) => b[1] - a[1]).slice(0, 5);
       if (allianceList) {
@@ -1811,7 +1921,6 @@
         `).join('') : `<div class="text-xs text-slate-500 text-center py-4">No alliance volume recorded.</div>`;
       }
 
-      // Defender Vulnerability Matrix
       const defendersGrid = document.getElementById('analytics-defenders-grid');
       const victimCounts = {};
       attackLogs.forEach(l => {
@@ -1830,6 +1939,110 @@
           </div>
         `).join('') : `<div class="col-span-3 text-xs text-slate-500 text-center py-4">No defender vulnerability data available.</div>`;
       }
+    };
+
+    // Render Admin Spreadsheet Data Grid
+    window.renderAdminGrid = function() {
+      const tbody = document.getElementById('admin-grid-tbody');
+      const badge = document.getElementById('admin-anomaly-badge');
+      if (!tbody) return;
+
+      let totalAnomaliesCount = 0;
+      const search = (document.getElementById('admin-grid-search')?.value || '').toLowerCase();
+      const showAnomaliesOnly = document.getElementById('admin-filter-anomalies')?.checked || false;
+
+      const filteredLogs = attackLogs.filter(l => {
+        const anomalies = detectLogAnomalies(l);
+        if (anomalies.length > 0) totalAnomaliesCount++;
+
+        if (showAnomaliesOnly && anomalies.length === 0) return false;
+
+        const matchStr = `${l.id} ${l.timestamp} ${l.attackerTag} ${l.attackerName} ${l.attackerId} ${l.victimTag} ${l.victimName} ${l.victimCoords}`.toLowerCase();
+        return matchStr.includes(search);
+      });
+
+      if (badge) {
+        if (totalAnomaliesCount > 0) {
+          badge.classList.remove('hidden');
+          badge.innerText = `${totalAnomaliesCount} Anomaly${totalAnomaliesCount > 1 ? 'es' : ''}`;
+        } else {
+          badge.classList.add('hidden');
+        }
+      }
+
+      if (filteredLogs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500 text-xs">No records match your admin grid criteria.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filteredLogs.map(l => {
+        const anomalies = detectLogAnomalies(l);
+        const hasAnomaly = anomalies.length > 0;
+
+        return `
+          <tr class="hover:bg-frost-700/20 transition-colors ${hasAnomaly ? 'bg-red-950/20' : ''}">
+            <!-- Timestamp -->
+            <td class="p-2.5 align-top">
+              <input type="text" id="admin-ts-${l.id}" value="${l.timestamp || ''}" class="bg-frost-900 border ${hasAnomaly ? 'border-red-500/40' : 'border-frost-700'} text-[11px] text-slate-200 px-2 py-1 rounded w-full focus:outline-none focus:border-frost-accent font-mono">
+            </td>
+
+            <!-- Attacker (Tag / IGN) -->
+            <td class="p-2.5 align-top">
+              <div class="flex gap-1.5">
+                <input type="text" id="admin-atag-${l.id}" value="${l.attackerTag || ''}" placeholder="Tag" class="bg-frost-900 border border-frost-700 text-[11px] text-red-400 font-bold px-2 py-1 rounded w-16 focus:outline-none focus:border-frost-accent">
+                <input type="text" id="admin-aname-${l.id}" value="${l.attackerName || ''}" placeholder="Attacker Name" class="bg-frost-900 border border-frost-700 text-[11px] text-slate-100 font-semibold px-2 py-1 rounded flex-1 focus:outline-none focus:border-frost-accent">
+              </div>
+            </td>
+
+            <!-- Attacker ID -->
+            <td class="p-2.5 align-top">
+              <input type="text" id="admin-aid-${l.id}" list="known-players-list" value="${l.attackerId || ''}" placeholder="ID e.g. 84920" class="bg-frost-900 border ${!l.attackerId ? 'border-amber-500/50' : 'border-frost-700'} text-[11px] text-amber-300 font-mono px-2 py-1 rounded w-full focus:outline-none focus:border-frost-accent">
+            </td>
+
+            <!-- Victim (Tag / IGN / Coords) -->
+            <td class="p-2.5 align-top">
+              <div class="flex flex-col gap-1">
+                <div class="flex gap-1.5">
+                  <input type="text" id="admin-vtag-${l.id}" value="${l.victimTag || 'ASS'}" placeholder="Tag" class="bg-frost-900 border border-frost-700 text-[11px] text-sky-300 font-bold px-2 py-1 rounded w-16 focus:outline-none focus:border-frost-accent">
+                  <input type="text" id="admin-vname-${l.id}" value="${l.victimName || ''}" placeholder="Victim Name" class="bg-frost-900 border border-frost-700 text-[11px] text-slate-100 px-2 py-1 rounded flex-1 focus:outline-none focus:border-frost-accent">
+                </div>
+                <input type="text" id="admin-vcoords-${l.id}" value="${l.victimCoords || ''}" placeholder="X:393, Y:802" class="bg-frost-900 border border-frost-700 text-[10px] text-slate-400 px-2 py-0.5 rounded w-full focus:outline-none focus:border-frost-accent font-mono">
+              </div>
+            </td>
+
+            <!-- Outcome & Casualties -->
+            <td class="p-2.5 align-top">
+              <div class="flex flex-col gap-1">
+                <select id="admin-outcome-${l.id}" class="bg-frost-900 border border-frost-700 text-[10px] text-slate-200 px-1.5 py-1 rounded focus:outline-none focus:border-frost-accent">
+                  <option value="Defeat" ${l.outcome === 'Defeat' ? 'selected' : ''}>Defeat (Burned)</option>
+                  <option value="Victory" ${l.outcome === 'Victory' ? 'selected' : ''}>Victory (Defended)</option>
+                </select>
+                <input type="number" id="admin-losses-${l.id}" value="${l.losses || 0}" placeholder="Losses" class="bg-frost-900 border border-frost-700 text-[10px] text-red-300 font-bold px-2 py-0.5 rounded w-full focus:outline-none focus:border-frost-accent">
+              </div>
+            </td>
+
+            <!-- Status & Actions -->
+            <td class="p-2.5 align-top text-center">
+              <div class="flex flex-col items-center gap-1.5">
+                ${hasAnomaly ? `
+                  <div class="flex flex-wrap gap-1 justify-center max-w-[140px]">
+                    ${anomalies.map(a => `<span class="bg-red-500/20 text-red-300 border border-red-500/30 text-[9px] px-1 py-0.5 rounded">${a}</span>`).join('')}
+                  </div>
+                ` : `<span class="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">Clean</span>`}
+
+                <div class="flex items-center gap-1.5 mt-1">
+                  <button id="btn-save-row-${l.id}" onclick="window.saveAdminGridRow('${l.id}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-frost-900 font-bold rounded text-[10px] cursor-pointer transition-all flex items-center gap-1">
+                    <i data-lucide="save" class="w-3 h-3"></i> Save
+                  </button>
+                  <button onclick="window.handleTriggerDelete('${l.id}')" class="px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded text-[10px] font-bold cursor-pointer transition-all">
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
     };
   </script>
 </body>
