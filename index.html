@@ -1289,11 +1289,81 @@
 
     // Master UI Render Engine (Combat Feed, Leaderboards, Analytics)
     window.renderApp = function() {
+      window.renderTicker();
       window.renderStatsBanner();
       window.renderFeed();
       window.renderEvidenceFeed();
       window.renderAnalytics();
       lucide.createIcons();
+    };
+
+    function parseLogDate(ts) {
+      if (!ts) return null;
+      if (ts instanceof Date) return isNaN(ts.getTime()) ? null : ts;
+      if (typeof ts === 'number') return new Date(ts);
+      if (typeof ts === 'string') {
+        let cleanTs = ts.trim().replace(' ', 'T');
+        let d = new Date(cleanTs);
+        if (!isNaN(d.getTime())) return d;
+        d = new Date(ts.replace(/-/g, '/'));
+        if (!isNaN(d.getTime())) return d;
+      }
+      return null;
+    }
+
+    window.renderTicker = function() {
+      const tickerElem = document.getElementById('ticker-content');
+      if (!tickerElem) return;
+
+      if (!attackLogs || attackLogs.length === 0) {
+        tickerElem.innerHTML = `<span>[SYSTEM LOG] Listening for live attack broadcasts across State #4336...</span>`;
+        return;
+      }
+
+      const now = new Date().getTime();
+      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+      // Filter logs within 24h window
+      let recentLogs = attackLogs.filter(l => {
+        const logDate = parseLogDate(l.timestamp);
+        if (!logDate) return false;
+        const diff = now - logDate.getTime();
+        return diff <= TWENTY_FOUR_HOURS && diff >= 0;
+      });
+
+      // Fallback: If no logs in past 24h, use the 5 most recent logs overall
+      if (recentLogs.length === 0) {
+        recentLogs = [...attackLogs].sort((a, b) => {
+          const dA = parseLogDate(a.timestamp);
+          const dB = parseLogDate(b.timestamp);
+          return (dB ? dB.getTime() : 0) - (dA ? dA.getTime() : 0);
+        }).slice(0, 5);
+      }
+
+      if (recentLogs.length === 0) {
+        tickerElem.innerHTML = `<span>[SYSTEM LOG] Listening for live attack broadcasts across State #4336...</span>`;
+        return;
+      }
+
+      // Generate marquee items for recent logs
+      let items = recentLogs.map(l => {
+        const aTag = l.attackerTag ? `[${l.attackerTag}] ` : '';
+        const aName = l.attackerName || l.attacker || 'Unknown';
+        const vTag = l.victimTag ? `[${l.victimTag}] ` : '';
+        const vName = l.victimName || l.victim || 'Unknown';
+        const coords = (l.victimCoords || l.coords) ? ` (${l.victimCoords || l.coords})` : '';
+        const losses = l.losses ? ` | Losses: ${Number(l.losses).toLocaleString()}` : '';
+        const time = l.timestamp ? ` @ ${l.timestamp}` : '';
+        return `<span class="inline-flex items-center gap-1.5"><strong class="text-red-400">🚨 ALERT:</strong> <span class="text-slate-200">${aTag}${aName}</span> <span class="text-red-400 font-bold">attacked</span> <span class="text-sky-300">${vTag}${vName}</span>${coords}${losses}<span class="text-slate-400">${time}</span></span>`;
+      });
+
+      // Repeat items array if short to ensure smooth scrolling ticker continuity
+      let tickerItems = [...items];
+      if (tickerItems.length < 4) {
+        tickerItems = [...tickerItems, ...tickerItems, ...tickerItems];
+      }
+
+      tickerElem.innerHTML = tickerItems.join('<span class="text-red-500/50 px-2">•</span>');
     };
 
     window.renderStatsBanner = function() {
